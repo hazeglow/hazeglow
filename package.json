@@ -1,0 +1,66 @@
+{
+  "name": "@scoobynko/afterglow",
+  "version": "0.0.0",
+  "description": "Soft, grainy, glowing gradients for React. One WebGL2 fragment shader, zero dependencies.",
+  "keywords": [
+    "react",
+    "gradient",
+    "mesh-gradient",
+    "background",
+    "webgl",
+    "webgl2",
+    "shader",
+    "grain",
+    "noise"
+  ],
+  "author": "Jakub Šalmík <som@jakubsalmik.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/scoobynko/afterglow.git"
+  },
+  "homepage": "https://www.jakubsalmik.com/afterglow",
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.mjs"
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": "^18 || ^19"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^5.0.3"
+  }
+}
