@@ -1,6 +1,6 @@
 {
   "name": "@scoobynko/afterglow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Soft, grainy, glowing gradients for React. One WebGL2 fragment shader, zero dependencies.",
   "keywords": [
     "react",
