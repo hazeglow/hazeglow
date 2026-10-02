@@ -1,6 +1,6 @@
 # @scoobynko/afterglow
 
-Soft, grainy, glowing gradients for React. You describe a gradient as a small JSON config and the component draws it on a canvas: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. It is one WebGL2 fragment shader. Zero runtime dependencies. ~10kb gzipped. MIT.
+Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. One WebGL2 fragment shader. Zero dependencies. ~10kb gzipped. MIT.
 
 **Design your own:** https://www.jakubsalmik.com/afterglow
 
@@ -28,29 +28,25 @@ export function Hero() {
 }
 ```
 
-The canvas fills its parent, so give the parent a size. There is no CSS file to import.
+The canvas fills its parent, so give the parent a size. No CSS to import.
 
-It works in the Next.js App Router as is. `Afterglow` is a client component, and you can render it from a server component.
+Works in the Next.js App Router as is. `Afterglow` is a client component you can render from a server component.
 
 ### Props
 
-| Prop            | Type                  | Description                                                                 |
-| --------------- | --------------------- | --------------------------------------------------------------------------- |
-| `config`        | `GradientConfig`      | The gradient. Required. Pass a new object to change it.                     |
-| `className`     | `string`              | Pass-through class for the canvas.                                          |
-| `style`         | `CSSProperties`       | Merged over the default `display: block; width: 100%; height: 100%`.        |
-| `onUnsupported` | `() => void`          | Called once if WebGL2 on a GPU is not available. Show your fallback here.   |
-| `ref`           | `Ref<AfterglowHandle>` | `ref.current.getTime()` returns the animation clock in seconds.            |
+| Prop            | Type                   | Description                                                      |
+| --------------- | ---------------------- | ---------------------------------------------------------------- |
+| `config`        | `GradientConfig`       | The gradient. Required. Pass a new object to change it.          |
+| `className`     | `string`               | Class for the canvas.                                            |
+| `style`         | `CSSProperties`        | Merged over `display: block; width: 100%; height: 100%`.         |
+| `onUnsupported` | `() => void`           | Called once when there is no WebGL2 on a GPU. Show a fallback.   |
+| `ref`           | `Ref<AfterglowHandle>` | `ref.current.getTime()` returns the animation clock in seconds.  |
 
-The canvas is `aria-hidden`. It is decoration, so put your content next to it or on top of it.
+The canvas is `aria-hidden`. It's decoration, so your content goes next to it or on top.
 
 ## Design a gradient
 
-You do not have to write the config by hand.
-
-1. Open https://www.jakubsalmik.com/afterglow and shape the gradient with the controls.
-2. Copy the JSON.
-3. Paste it as `config`.
+Don't write the config by hand. Shape the gradient at https://www.jakubsalmik.com/afterglow, copy the JSON, paste it as `config`.
 
 ```tsx
 import { Afterglow, type GradientConfig } from "@scoobynko/afterglow";
@@ -85,7 +81,7 @@ const config: GradientConfig = {
 <Afterglow config={config} />;
 ```
 
-If the config comes from somewhere you do not control (a CMS, a URL, a `.json` file), run it through `parseConfig` first. It never throws. Missing or invalid fields fall back to the defaults and numbers are clamped to their range.
+Config from a CMS, a URL or a `.json` file? Run it through `parseConfig` first. It never throws. Missing or invalid fields fall back to the defaults, numbers get clamped.
 
 ```tsx
 import { Afterglow, parseConfig } from "@scoobynko/afterglow";
@@ -93,72 +89,70 @@ import { Afterglow, parseConfig } from "@scoobynko/afterglow";
 <Afterglow config={parseConfig(untrusted)} />;
 ```
 
-`encodeConfig(config)` turns a config into a URL-safe string and `decodeConfig(string)` turns it back, for share links.
+For share links, `encodeConfig(config)` gives a URL-safe string and `decodeConfig(string)` turns it back.
 
 ## Presets
 
-Six ready-made configs, the ones in the picture above, left to right and top to bottom:
+Six of them, the ones in the picture, left to right and top to bottom: `dusk`, `pearl`, `ember`, `horizon`, `ultraviolet`, `candy`.
 
-`presets.dusk`, `presets.pearl`, `presets.ember`, `presets.horizon`, `presets.ultraviolet`, `presets.candy`
-
-Use one as a starting point and override what you need:
+Start from one and override what you need:
 
 ```tsx
 <Afterglow config={{ ...presets.horizon, motion: "breathe", grain: 0.5 }} />
 ```
 
-`presets` is typed as `Record<string, GradientConfig>`. If your project has `noUncheckedIndexedAccess` on, write `presets.dusk!`.
+`presets` is a `Record<string, GradientConfig>`. With `noUncheckedIndexedAccess` on, write `presets.dusk!`.
 
-`randomConfig(seed)` returns a new, good-looking config for any integer seed. The same seed always gives the same gradient.
+`randomConfig(seed)` returns a good-looking config for any integer seed. Same seed, same gradient.
 
 ## Config reference
 
-Positions and sizes are fractions of the canvas: `[0, 0]` is the top left corner and `[1, 1]` the bottom right. Colours are hex strings, `#rgb` or `#rrggbb`. They are blended in Oklab, so the steps between them stay clean.
+Positions and sizes are fractions of the canvas: `[0, 0]` is top left, `[1, 1]` bottom right. Colours are hex, `#rgb` or `#rrggbb`, blended in Oklab so the steps stay clean.
 
-| Field           | Type / range                                                      | What it does                                                                                             |
-| --------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `version`       | `1`                                                               | Config format version.                                                                                   |
-| `seed`          | integer                                                           | Picks the noise pattern for the warp and the grain.                                                      |
-| `shape`         | `"pill" \| "band" \| "blob" \| "ring" \| "mesh"`                   | The form of the glow. `mesh` uses `mesh` points instead of `palette`.                                    |
-| `center`        | `[x, y]`, 0 to 1                                                  | Where the shape sits.                                                                                    |
-| `size`          | `[width, height]`, 0 to 1.5                                       | How big the shape is. `1` spans the canvas.                                                              |
-| `roundness`     | 0 to 1                                                            | `0` is a rounded box, `1` an ellipse. For `blob`, lower is more irregular.                               |
-| `softness`      | 0 to 1                                                            | How far the edge fades out. For `mesh`, how much the points melt into each other.                        |
-| `rotation`      | 0 to 360                                                          | Turns the shape, in degrees.                                                                             |
-| `rampDirection` | 0 to 1                                                            | `0` runs the colours from the middle outwards, `1` runs them in a line along `angle`.                    |
-| `angle`         | 0 to 360                                                          | Direction of the colour line, in degrees. `90` is top to bottom.                                         |
-| `warp`          | 0 to 1                                                            | How much the shape is bent by noise.                                                                     |
-| `warpScale`     | 0.5 to 4                                                          | Size of the bends. Higher is finer.                                                                      |
-| `palette`       | 2 to 10 colours                                                   | The colour stops, first to last.                                                                         |
-| `background`    | colour                                                            | What is behind the shape.                                                                                |
-| `mesh`          | up to 16 `[x, y, colour]` points                                  | The colour points for `shape: "mesh"`. Ignored by the other shapes.                                      |
-| `grain`         | 0 to 1                                                            | Film grain strength.                                                                                     |
-| `motion`        | `"none" \| "drift" \| "breathe" \| "flow"`                         | `drift` slowly reshapes, `breathe` pulses in size, `flow` slides the colours.                            |
-| `speed`         | 0 to 2                                                            | Motion speed multiplier.                                                                                 |
-| `loop`          | 0 to 30                                                           | Length of a seamless loop in seconds. `0` never repeats.                                                 |
-| `hover`         | 0 to 1                                                            | How strongly the gradient reacts to the pointer. `0` turns it off.                                       |
-| `hoverMode`     | `"pull" \| "push"`                                                 | Whether the gradient is drawn towards the pointer or pushed away from it.                                |
-| `effect`        | `"none" \| "dither" \| "ascii" \| "halftone" \| "pixelate" \| "glass"` | A stylised finish on top of the gradient.                                                                |
-| `effectSize`    | 2 to 64                                                           | Cell size of the effect.                                                                                 |
-| `effectAmount`  | 0 to 1                                                            | Strength of the effect.                                                                                  |
+| Field           | Type / range                                                           | What it does                                                                  |
+| --------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `version`       | `1`                                                                    | Config format version.                                                        |
+| `seed`          | integer                                                                | Noise pattern for the warp and the grain.                                     |
+| `shape`         | `"pill" \| "band" \| "blob" \| "ring" \| "mesh"`                       | Form of the glow. `mesh` uses `mesh` points instead of `palette`.             |
+| `center`        | `[x, y]`, 0 to 1                                                       | Where the shape sits.                                                         |
+| `size`          | `[width, height]`, 0 to 1.5                                            | Shape size. `1` spans the canvas.                                             |
+| `roundness`     | 0 to 1                                                                 | `0` is a rounded box, `1` an ellipse. For `blob`, lower is more irregular.    |
+| `softness`      | 0 to 1                                                                 | How far the edge fades. For `mesh`, how much the points melt together.        |
+| `rotation`      | 0 to 360                                                               | Turns the shape, in degrees.                                                  |
+| `rampDirection` | 0 to 1                                                                 | `0` runs the colours from the middle out, `1` in a line along `angle`.        |
+| `angle`         | 0 to 360                                                               | Direction of the colour line, in degrees. `90` is top to bottom.              |
+| `warp`          | 0 to 1                                                                 | How much noise bends the shape.                                               |
+| `warpScale`     | 0.5 to 4                                                               | Size of the bends. Higher is finer.                                           |
+| `palette`       | 2 to 10 colours                                                        | Colour stops, first to last.                                                  |
+| `background`    | colour                                                                 | What's behind the shape.                                                      |
+| `mesh`          | up to 16 `[x, y, colour]` points                                       | Colour points for `shape: "mesh"`. Ignored by the other shapes.               |
+| `grain`         | 0 to 1                                                                 | Film grain strength.                                                          |
+| `motion`        | `"none" \| "drift" \| "breathe" \| "flow"`                             | `drift` slowly reshapes, `breathe` pulses in size, `flow` slides the colours. |
+| `speed`         | 0 to 2                                                                 | Motion speed multiplier.                                                      |
+| `loop`          | 0 to 30                                                                | Seamless loop length in seconds. `0` never repeats.                           |
+| `hover`         | 0 to 1                                                                 | How strongly the gradient reacts to the pointer. `0` is off.                  |
+| `hoverMode`     | `"pull" \| "push"`                                                     | Towards the pointer or away from it.                                          |
+| `effect`        | `"none" \| "dither" \| "ascii" \| "halftone" \| "pixelate" \| "glass"` | A stylised finish on top.                                                     |
+| `effectSize`    | 2 to 64                                                                | Effect cell size.                                                             |
+| `effectAmount`  | 0 to 1                                                                 | Effect strength.                                                              |
 
 The lists and limits are exported, so you can build your own controls: `SHAPES`, `MOTIONS`, `EFFECTS`, `HOVER_MODES`, `RANGES`, `MIN_STOPS`, `MAX_STOPS`, `MAX_MESH_POINTS`, `DEFAULT_CONFIG`.
 
 ## Hover
 
-Set `hover` above `0` and the gradient follows the pointer, then eases back when it leaves.
+Set `hover` above `0`. The gradient follows the pointer and eases back when it leaves.
 
 ```tsx
 <Afterglow config={{ ...presets.dusk, hover: 0.6, hoverMode: "pull" }} />
 ```
 
-- It listens to pointer events, so mouse, pen and touch all drive it.
-- While hover is on, the canvas sets `touch-action: pan-y`, so a finger on the gradient still scrolls the page up and down. Override it through `style` if you want something else, for example `style={{ touchAction: "none" }}` on a full-screen gradient.
-- While hover is off, the pointer handlers do nothing and `touch-action` is left alone.
+- Pointer events, so mouse, pen and touch all drive it.
+- Hover on: the canvas sets `touch-action: pan-y`, so a finger on the gradient still scrolls the page. Override it through `style`, for example `style={{ touchAction: "none" }}` on a full-screen gradient.
+- Hover off: the pointer handlers do nothing and `touch-action` is left alone.
 
 ## Without React
 
-The engine has its own entry point with no React import. Use it in Vue, Svelte, plain JavaScript, a worker with an `OffscreenCanvas`, or to render a single frame for an image export.
+`/core` is the engine with no React import. Use it in Vue, Svelte, plain JavaScript, a worker with an `OffscreenCanvas`, or to render one frame for an image export.
 
 ```ts
 import { createRenderer, presets } from "@scoobynko/afterglow/core";
@@ -172,47 +166,37 @@ if (renderer) {
 }
 ```
 
-- `createRenderer(canvas)` returns `null` when WebGL2 on a GPU is not available.
-- `renderer.render(config, time, pointer?)` draws one frame. `time` is in seconds. The same config and time always give the same picture.
+- `createRenderer(canvas)` returns `null` when there is no WebGL2 on a GPU.
+- `renderer.render(config, time, pointer?)` draws one frame. `time` is in seconds. Same config and time, same picture.
 - `renderer.resize(width, height)` sets the size in device pixels. `renderer.maxSize` is the largest side the GPU allows.
 - `renderer.dispose()` frees the shader program and the listeners.
 
-To animate, call `render` from `requestAnimationFrame` with a growing `time`. To save a frame, read the canvas (`toBlob`, `drawImage`) right after `render`, in the same task, because the drawing buffer is not kept between frames.
+To animate, call `render` from `requestAnimationFrame` with a growing `time`. To save a frame, read the canvas (`toBlob`, `drawImage`) right after `render`, in the same task. The drawing buffer isn't kept between frames.
 
-Everything on `/core` is also exported from the main entry: `parseConfig`, `encodeConfig`, `decodeConfig`, `presets`, `randomConfig`, `randomMesh`, `mulberry32`, the colour helpers (`isHex`, `parseHex`, `toHex`, `srgbToLinear`, `linearToSrgb`, `linearToOklab`, `hexToOklab`) and the pointer easing used by the component (`IDLE_POINTER`, `stepPointer`, `isSettled`).
+Everything on `/core` is also in the main entry: `parseConfig`, `encodeConfig`, `decodeConfig`, `presets`, `randomConfig`, `randomMesh`, `mulberry32`, the colour helpers (`isHex`, `parseHex`, `toHex`, `srgbToLinear`, `linearToSrgb`, `linearToOklab`, `hexToOklab`) and the pointer easing the component uses (`IDLE_POINTER`, `stepPointer`, `isSettled`).
 
 ## Limits
 
-- **It needs WebGL2 with a GPU.** Software rendering is refused on purpose, because it took 9 to 10 seconds to start. When there is no GPU the canvas stays empty and `onUnsupported` is called, so keep a CSS background behind it as a fallback.
-- **About 16 gradients per page.** Browsers cap live WebGL contexts at roughly 16 per page and each `Afterglow` uses one. Past the cap the browser drops the oldest ones.
-- **Reduced motion turns motion off.** Under `prefers-reduced-motion: reduce` the gradient is drawn as a still frame and hover is disabled.
-- **Tested in Chrome only so far.** Safari, Firefox and real phones are untested.
-- The canvas is empty until JavaScript runs. There is nothing to see in server-rendered HTML.
+- **Needs WebGL2 on a GPU.** Software rendering is refused on purpose. It took 9 to 10 seconds to start. No GPU means an empty canvas and an `onUnsupported` call, so keep a CSS background behind it.
+- **About 16 per page.** Browsers cap live WebGL contexts at roughly 16 and each `Afterglow` uses one. Past the cap the oldest get dropped.
+- **Reduced motion means no motion.** Under `prefers-reduced-motion: reduce` you get a still frame and no hover.
+- **Tested in Chrome only.** Safari, Firefox and real phones are untested.
+- **Nothing in server-rendered HTML.** The canvas is empty until JavaScript runs.
 
-To keep it light, the animation loop pauses while the canvas is off screen or the tab is hidden, the device pixel ratio is capped at 2, and the loop never re-renders React.
+To stay light, the loop pauses while the canvas is off screen or the tab is hidden, device pixel ratio is capped at 2, and the loop never re-renders React.
 
 ## Contributing
 
 PRs welcome.
 
-1. Branch off `main`. `main` is protected, so every change goes through a PR. Name the branch `type/short-description`, for example `feat/hover-strength`. The type is one of `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, and the description is lowercase with hyphens. CI rejects other names.
-2. Before pushing, run `npm run typecheck`, `npm test` and `npm run build`. All three must pass.
-3. If your change touches `src/`, add a changeset:
-   ```bash
-   npx changeset
-   ```
-   Pick `patch` (bug fix), `minor` (additive feature), or `major` (breaking change), and write a one-line summary from the consumer's perspective. CI fails without one.
-4. Open a PR with `gh pr create`.
+1. Branch off `main` as `type/short-description`, for example `feat/hover-strength`. The type is one of `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`. Lowercase with hyphens. CI rejects other names.
+2. Run `npm run typecheck`, `npm test` and `npm run build`. All three must pass.
+3. Touched `src/`? Run `npx changeset`. Pick `patch` (bug fix), `minor` (feature) or `major` (breaking change) and write a one-line summary from the consumer's perspective. CI fails without one.
+4. Open a PR.
 
-### Release automation
+Releases are automated. Merging a PR with a changeset opens (or updates) a "version packages" PR that bumps `package.json` and updates `CHANGELOG.md`. Merging that one publishes to npm and tags the release.
 
-You don't run `npm publish`, `npm version`, or tag releases by hand.
-
-- Merging a PR to `main` runs the [Release workflow](.github/workflows/release.yml).
-- If pending changesets exist, it opens (or updates) a "version packages" PR that bumps `package.json` and updates `CHANGELOG.md`.
-- Merging that PR publishes to npm and tags the release.
-
-Don't commit `dist/` or `node_modules/`, don't edit changeset files in the version PR, and don't add runtime dependencies. This package is zero-deps.
+Don't run `npm publish` or `npm version`, don't tag by hand, don't commit `dist/` or `node_modules/`, don't edit changeset files in the version PR, and don't add runtime dependencies.
 
 ## License
 
