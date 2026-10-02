@@ -32,9 +32,9 @@ function litPixels(bits: number): number {
   return bits.toString(2).replace(/0/g, "").length;
 }
 
-const GLYPHS = GLYPH_ROWS.map(glyphBits).sort((a, b) => litPixels(a) - litPixels(b));
-
-export const FRAGMENT_SHADER = `#version 300 es
+export function fragmentShader(): string {
+  const glyphs = GLYPH_ROWS.map(glyphBits).sort((a, b) => litPixels(a) - litPixels(b));
+  return `#version 300 es
 precision highp float;
 precision highp int;
 
@@ -87,8 +87,8 @@ const int EFFECT_ASCII = 2;
 const int EFFECT_HALFTONE = 3;
 const int EFFECT_PIXELATE = 4;
 const int EFFECT_GLASS = 5;
-const int GLYPH_COUNT = ${GLYPHS.length};
-const int GLYPHS[GLYPH_COUNT] = int[GLYPH_COUNT](${GLYPHS.join(", ")});
+const int GLYPH_COUNT = ${glyphs.length};
+const int GLYPHS[GLYPH_COUNT] = int[GLYPH_COUNT](${glyphs.join(", ")});
 const float TAU = 6.28318530718;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 const mat2 HALFTONE_ROTATION = mat2(0.70710678, -0.70710678, 0.70710678, 0.70710678);
@@ -393,3 +393,4 @@ void main() {
   outColor = vec4(clamp(color, 0.0, 1.0), 1.0);
 }
 `;
+}

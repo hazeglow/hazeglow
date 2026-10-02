@@ -38,7 +38,7 @@ Skip the changeset for: docs-only edits, CI/workflow changes, `.gitignore`, `CLA
 - Entry points: `@scoobynko/afterglow` (component plus engine) and `@scoobynko/afterglow/core` (engine only, no React import, no `"use client"`).
 - Component: `Afterglow` with props `config`, `className`, `style`, `onUnsupported`, and a ref handle with `getTime()`. Types `AfterglowProps`, `AfterglowHandle`.
 - Engine exports: the list in `src/core.ts`. `tests/exports.test.ts` pins it.
-- The picture: a given config and time must render the same pixels across releases. The portfolio at jakubsalmik.com/afterglow imports this package and its share links depend on that. Treat any edit to `src/shader.ts` or to the uniforms in `src/renderer.ts` as a breaking change unless the output is proven identical.
+- The picture: a given config and time must render the same pixels across releases. The portfolio at jakubsalmik.com/afterglow imports this package and its share links depend on that. Treat any edit to `src/shader.ts` or to the uniforms in `src/renderer.ts` as a breaking change unless the output is proven identical. `tests/shader.test.ts` pins both shader sources by hash.
 - `parseConfig` never throws and returns keys in the same order as `DEFAULT_CONFIG`, so encoded links survive a round trip.
 
 ## Decisions already made
@@ -46,6 +46,7 @@ Skip the changeset for: docs-only edits, CI/workflow changes, `.gitignore`, `CLA
 - The renderer re-sends all uniforms every frame. Caching them by config identity was measured (about 4 microseconds per frame saved) and rejected, because a config mutated in place would silently stop updating. The test "picks up a config that was changed in place" pins this.
 - In `Afterglow`, time and pointer live in refs so the animation loop causes zero React re-renders, and `setEngaged` is guarded by a ref. Keep it that way.
 - `failIfMajorPerformanceCaveat: true` stays. Software rendering took 9 to 10 seconds to start.
+- The fragment shader source is built inside `fragmentShader()`, not at module level, so bundlers can drop it for consumers who only import config helpers. The build fails if the shader shows up in such a bundle. Keep module-level code in the engine free of calls for the same reason.
 - `touch-action` is `pan-y` while hover is on and unset while it is off.
 
 ## Things to never do
