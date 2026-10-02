@@ -27,7 +27,9 @@ Skip the changeset for: docs-only edits, CI/workflow changes, `.gitignore`, `CLA
 
 ## Branch + PR flow
 
-- Work in a short-named branch (`fix/...`, `feat/...`, `chore/...`, `docs/...`).
+- `main` is protected. Never push to it directly; the ruleset will reject it.
+- Name the branch `type/short-description`: lowercase letters and digits with single hyphens or dots. The type is one of `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`. The "Conventional branch name" check fails the PR otherwise, and it is a required check.
+- The branch type does not decide the release. The changeset does: a PR with a changeset leads to a release, a PR without one does not.
 - Open a PR with `gh pr create`. The user merges.
 - After merge, the Release workflow either opens a "version packages" PR (if changesets are pending) or publishes.
 

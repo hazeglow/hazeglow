@@ -195,7 +195,7 @@ To keep it light, the animation loop pauses while the canvas is off screen or th
 
 PRs welcome.
 
-1. Branch off `main`: `fix/...`, `feat/...`, `chore/...`, or `docs/...`.
+1. Branch off `main`. `main` is protected, so every change goes through a PR. Name the branch `type/short-description`, for example `feat/hover-strength`. The type is one of `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, and the description is lowercase with hyphens. CI rejects other names.
 2. Before pushing, run `npm run typecheck`, `npm test` and `npm run build`. All three must pass.
 3. If your change touches `src/`, add a changeset:
    ```bash
