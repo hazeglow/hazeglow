@@ -1,3 +1,4 @@
+import { build } from "esbuild";
 import { defineConfig } from "tsup";
 import { readFileSync, readdirSync } from "node:fs";
 
@@ -8,6 +9,18 @@ const SIBLINGS: Record<string, string> = {
 
 function read(file: string): string {
   return readFileSync(`dist/${file}`, "utf8");
+}
+
+async function bundleFor(imports: string): Promise<string> {
+  const result = await build({
+    stdin: { contents: `import { ${imports} } from "./dist/core.mjs"; console.log(${imports});`, resolveDir: "." },
+    bundle: true,
+    write: false,
+    format: "esm",
+    minify: true,
+    logLevel: "silent",
+  });
+  return result.outputFiles[0]?.text ?? "";
 }
 
 export default defineConfig({
@@ -49,5 +62,9 @@ export default defineConfig({
     if (!index.includes('from"./afterglow.mjs"') || !index.includes('from"./core.mjs"')) {
       throw new Error("index.mjs must re-export the component and the engine from their own files");
     }
+    const helpers = await bundleFor("parseConfig, encodeConfig");
+    const renderer = await bundleFor("createRenderer");
+    if (!helpers.includes("btoa") || !renderer.includes("#version 300 es")) throw new Error("the tree-shaking check is not looking at real bundles");
+    if (helpers.includes("#version 300 es")) throw new Error("the shader must drop out of a bundle that never creates a renderer");
   },
 });

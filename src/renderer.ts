@@ -2,7 +2,7 @@ import { hexToOklab } from "./color";
 import { EFFECTS, MAX_MESH_POINTS, MAX_STOPS, MOTIONS, SHAPES, type GradientConfig } from "./config";
 import { IDLE_POINTER, type PointerState } from "./pointer";
 import { mulberry32 } from "./random";
-import { FRAGMENT_SHADER, VERTEX_SHADER } from "./shader";
+import { VERTEX_SHADER, fragmentShader } from "./shader";
 
 export interface Renderer {
   readonly maxSize: number;
@@ -60,7 +60,7 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
 
 function link(gl: WebGL2RenderingContext): WebGLProgram | null {
   const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compile(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+  const fragment = compile(gl, gl.FRAGMENT_SHADER, fragmentShader());
   if (!vertex || !fragment) return null;
   const program = gl.createProgram();
   gl.attachShader(program, vertex);
