@@ -1,0 +1,34 @@
+name: Branch name
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  branch-name:
+    name: Conventional branch name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          PATTERN='^((feat|fix|chore|docs|refactor|test|ci|perf)/[a-z0-9]+([.-][a-z0-9]+)*|changeset-release/main)$'
+
+          if [[ "$BRANCH" =~ $PATTERN ]]; then
+            echo "Branch name is fine: $BRANCH"
+            exit 0
+          fi
+
+          echo "::error::Branch name does not follow type/short-description."
+          echo ""
+          echo "Got: $BRANCH"
+          echo ""
+          echo "Allowed types: feat, fix, chore, docs, refactor, test, ci, perf."
+          echo "The description is lowercase letters and digits, with single"
+          echo "hyphens or dots between words. For example: feat/hover-strength"
+          echo ""
+          echo "Rename the branch, push it, and open a new PR:"
+          echo "  git branch -m type/short-description"
+          exit 1
