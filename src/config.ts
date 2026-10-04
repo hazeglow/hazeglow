@@ -1,4 +1,4 @@
-import { isHex } from "./color";
+import { isColor } from "./css-color";
 
 export const SHAPES = ["pill", "band", "blob", "ring", "mesh"] as const;
 export const MOTIONS = ["none", "drift", "breathe", "flow"] as const;
@@ -119,7 +119,7 @@ function defaultStop(index: number): string {
 
 function parsePalette(value: unknown): string[] {
   if (!Array.isArray(value)) return [...DEFAULT_CONFIG.palette];
-  const stops = value.slice(0, MAX_STOPS).map((stop, index) => (isHex(stop) ? stop : defaultStop(index)));
+  const stops = value.slice(0, MAX_STOPS).map((stop, index) => (isColor(stop) ? stop : defaultStop(index)));
   while (stops.length < MIN_STOPS) stops.push(defaultStop(stops.length));
   return stops;
 }
@@ -131,7 +131,7 @@ function parseMesh(value: unknown): MeshPoint[] {
     if (points.length === MAX_MESH_POINTS) break;
     if (!Array.isArray(point) || point.length !== 3) continue;
     const [x, y, color] = point as unknown[];
-    if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isHex(color)) continue;
+    if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isColor(color)) continue;
     points.push([clamp(x, RANGES.center), clamp(y, RANGES.center), color]);
   }
   return points;
@@ -154,7 +154,7 @@ export function parseConfig(input: unknown): GradientConfig {
     warp: parseNumber(raw.warp, fallback.warp, RANGES.warp),
     warpScale: parseNumber(raw.warpScale, fallback.warpScale, RANGES.warpScale),
     palette: parsePalette(raw.palette),
-    background: isHex(raw.background) ? raw.background : fallback.background,
+    background: isColor(raw.background) ? raw.background : fallback.background,
     mesh: parseMesh(raw.mesh),
     grain: parseNumber(raw.grain, fallback.grain, RANGES.grain),
     motion: parseOption(raw.motion, MOTIONS, fallback.motion),

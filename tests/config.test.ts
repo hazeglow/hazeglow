@@ -229,3 +229,52 @@ describe("parseConfig hover", () => {
     expect(parseConfig({ hover: 0.7 })).toMatchObject({ hover: 0.7, hoverMode: "pull" });
   });
 });
+
+describe("parseConfig colours", () => {
+  const colourful = {
+    palette: ["#abc", "oklch(0.7 0.15 200)", "var(--brand)", "var(--a, oklch(0.5 0.1 20))"],
+    background: "var(--surface, #000)",
+    mesh: [
+      [0.2, 0.8, "oklch(0.7 0.1 200)"],
+      [0.1, 0.1, "var(--m, #fff)"],
+    ],
+  };
+
+  it("keeps oklch and var colours as given", () => {
+    expect(parseConfig(colourful)).toMatchObject(colourful);
+  });
+
+  it("falls back to the default stop for an invalid colour", () => {
+    const palette = ["oklch(0.5 0.1)", "var(--a, red)", " oklch(0.5 0.1 20)", "rgb(1,2,3)"];
+    expect(parseConfig({ palette }).palette).toEqual(DEFAULT_CONFIG.palette.slice(0, 4));
+  });
+
+  it("falls back to the default background for an invalid colour", () => {
+    for (const background of ["oklch(0.5)", "var(red)", "red", "var(--a, blue)"]) {
+      expect(parseConfig({ background }).background).toBe(DEFAULT_CONFIG.background);
+    }
+  });
+
+  it("still drops mesh points with an invalid colour", () => {
+    const mesh = [
+      [0.5, 0.5, "oklch(0.5 0.1)"],
+      [0.5, 0.5, "var(red)"],
+      [0.5, 0.5, "red"],
+      [0.2, 0.8, "oklch(0.7 0.1 200)"],
+      [0.1, 0.1, "var(--m, #fff)"],
+    ];
+    expect(parseConfig({ mesh }).mesh).toEqual([
+      [0.2, 0.8, "oklch(0.7 0.1 200)"],
+      [0.1, 0.1, "var(--m, #fff)"],
+    ]);
+  });
+
+  it("keeps the key order", () => {
+    expect(Object.keys(parseConfig(colourful))).toEqual(Object.keys(DEFAULT_CONFIG));
+  });
+
+  it("survives a deeply nested variable", () => {
+    const deep = "var(--a, ".repeat(10000) + "#fff" + ")".repeat(10000);
+    expect(parseConfig({ background: deep }).background).toBe(DEFAULT_CONFIG.background);
+  });
+});
