@@ -74,7 +74,12 @@ function scratchContext(scratch: Scratch): CanvasRenderingContext2D | null {
   let context: CanvasRenderingContext2D | null = null;
   try {
     const element = scratch.element;
-    if (element) context = element.ownerDocument.createElement("canvas").getContext("2d");
+    if (element) {
+      const canvas = element.ownerDocument.createElement("canvas");
+      canvas.width = 1;
+      canvas.height = 1;
+      context = canvas.getContext("2d");
+    }
   } catch {
     context = null;
   }
@@ -143,8 +148,9 @@ function resolveText(
   if (!token || depth > MAX_DEPTH) return null;
   const value = element ? readProperty(element, token.name) : "";
   if (value !== "") {
-    const lab = readValue(value, element, depth, scratch);
-    if (lab) {
+    const read = readValue(value, element, depth, scratch);
+    if (read) {
+      const lab: RGB = isHex(value) ? read : [Math.min(1, Math.max(0, read[0])), read[1], read[2]];
       return { text: isHex(value) || parseOklch(value) ? value : formatOklch(lab), lab };
     }
   }
@@ -164,6 +170,7 @@ export function createColors(element: Element | null, onChange: () => void): Col
   const scratch: Scratch = { element, context: undefined };
   let observer: MutationObserver | null = null;
   let media: MediaQueryList | null = null;
+  let disposed = false;
 
   function isLive(): boolean {
     try {
@@ -179,6 +186,7 @@ export function createColors(element: Element | null, onChange: () => void): Col
       if (!element || !element.isConnected) {
         for (const token of tokens) cache.delete(token);
         tokens.clear();
+        unwatch();
         return;
       }
       let changed = false;
@@ -196,45 +204,32 @@ export function createColors(element: Element | null, onChange: () => void): Col
     }
   }
 
-  const view = viewOf(element);
-  if (view && element) {
-    try {
-      observer = new view.MutationObserver(refresh);
-      observer.observe(element.ownerDocument.documentElement, {
-        attributes: true,
-        attributeFilter: ["class", "style", "data-theme"],
-      });
-    } catch {
-      observer = null;
-    }
-    try {
-      media = view.matchMedia(DARK_QUERY);
-      media.addEventListener("change", refresh);
-    } catch {
-      media = null;
-    }
-  }
-
-  function get(color: string): RGB {
-    const hit = cache.get(color);
-    if (hit) return hit;
-    const isToken = parseVar(color) !== null && isColor(color);
-    const lab: RGB = isToken
-      ? (resolveText(color, element, 0, scratch)?.lab ?? [0, 0, 0])
-      : (parseOklch(color) ?? hexToOklab(color));
-    const store = !isToken || isLive();
-    if (store) {
-      if (cache.size >= MAX_ENTRIES) {
-        cache.clear();
-        tokens.clear();
+  function watch(): void {
+    if (disposed) return;
+    const view = viewOf(element);
+    if (!view || !element) return;
+    if (observer === null) {
+      try {
+        observer = new view.MutationObserver(refresh);
+        observer.observe(element.ownerDocument.documentElement, {
+          attributes: true,
+          attributeFilter: ["class", "style", "data-theme"],
+        });
+      } catch {
+        observer = null;
       }
-      cache.set(color, lab);
-      if (isToken && element !== null) tokens.add(color);
     }
-    return lab;
+    if (media === null) {
+      try {
+        media = view.matchMedia(DARK_QUERY);
+        media.addEventListener("change", refresh);
+      } catch {
+        media = null;
+      }
+    }
   }
 
-  function dispose(): void {
+  function unwatch(): void {
     try {
       observer?.disconnect();
     } catch {
@@ -247,6 +242,37 @@ export function createColors(element: Element | null, onChange: () => void): Col
     }
     observer = null;
     media = null;
+  }
+
+  function get(color: string): RGB {
+    const hit = cache.get(color);
+    if (hit) return hit;
+    const isToken = isColor(color) && parseVar(color) !== null;
+    const lab: RGB = isToken
+      ? (resolveText(color, element, 0, scratch)?.lab ?? [0, 0, 0])
+      : ((typeof color === "string" ? parseOklch(color) : null) ?? hexToOklab(color));
+    const store = !isToken || isLive();
+    if (store) {
+      if (cache.size >= MAX_ENTRIES) {
+        for (const key of [...cache.keys()]) if (!tokens.has(key)) cache.delete(key);
+        if (cache.size >= MAX_ENTRIES) {
+          cache.clear();
+          tokens.clear();
+          unwatch();
+        }
+      }
+      cache.set(color, lab);
+      if (isToken && element !== null) {
+        tokens.add(color);
+        watch();
+      }
+    }
+    return lab;
+  }
+
+  function dispose(): void {
+    disposed = true;
+    unwatch();
     cache.clear();
     tokens.clear();
     scratch.context = undefined;
@@ -257,6 +283,7 @@ export function createColors(element: Element | null, onChange: () => void): Col
 }
 
 export function colorToOklab(color: string, element: Element | null = null): RGB | null {
+  if (typeof color !== "string") return null;
   if (isHex(color)) return hexToOklab(color);
   const oklch = parseOklch(color);
   if (oklch) return oklch;

@@ -256,3 +256,36 @@ describe("fuzz", () => {
     }
   });
 });
+
+describe("overflow and unsafe text", () => {
+  const OVERFLOW = [
+    "oklch(1e999% 0.1 20)",
+    "oklch(0.5 1e999% 20)",
+    "oklch(0.5 0.1 20 / 1e999%)",
+    "oklch(0.5 0.1 1e308)",
+  ];
+
+  it.each(OVERFLOW)("rejects %s", (input) => {
+    expect(isColor(input)).toBe(false);
+    expect(parseOklch(input)).toBeNull();
+  });
+
+  it("rejects overflow in other functions", () => {
+    expect(parseCssColor("lab(50% 1e999% 0)")).toBeNull();
+    expect(parseCssColor("color(srgb 1e999% 0 0)")).toBeNull();
+  });
+
+  const UNSAFE = [
+    "oklch(\u3000 0.5 0.1 20)",
+    "var(\u3000--a)",
+    "var(--a,\ufeff#fff)",
+    "oklch(0.5 0.1 20 /\u00a00.5)",
+    "oklch(0.5\v0.1 20)",
+  ];
+
+  it.each(UNSAFE)("rejects %j", (input) => {
+    expect(isColor(input)).toBe(false);
+    expect(parseOklch(input)).toBeNull();
+    expect(parseCssColor(input)).toBeNull();
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { hexToOklab } from "../src/color";
 import { DEFAULT_CONFIG, parseConfig, type GradientConfig } from "../src/config";
-import { parseCssColor } from "../src/css-color";
+import { parseCssColor, parseOklch } from "../src/css-color";
 import { colorToOklab, createColors, resolveConfig } from "../src/tokens";
 import { fakeDom } from "./support/dom";
 
@@ -179,14 +179,16 @@ describe("createColors", () => {
     expect(colors.get("junk")).toEqual(hexToOklab("junk"));
   });
 
-  it("evicts after 64 entries so a token is read again", () => {
+  it("clears everything when tokens alone fill the cache, and watches again", () => {
     const dom = fakeDom({ properties: { "--t": "#6a3df5" } });
     const colors = createColors(dom.element, () => {});
     colors.get("var(--t)");
-    for (let i = 0; i < 70; i++) colors.get(`oklch(0.5 0.1 ${i})`);
+    for (let i = 0; i < 70; i++) colors.get(`var(--x${i}, #fff)`);
+    expect(dom.observers[0]?.disconnected).toBe(1);
     const before = dom.counts.getComputedStyle;
-    colors.get("var(--t)");
+    expect(colors.get("var(--t)")).toEqual(hexToOklab("#6a3df5"));
     expect(dom.counts.getComputedStyle).toBeGreaterThan(before);
+    expect(dom.observers.length).toBeGreaterThan(1);
   });
 
   it("does not cache while the element is disconnected", () => {
@@ -197,18 +199,63 @@ describe("createColors", () => {
     expect(colors.get("var(--t)")).toEqual(hexToOklab("#6a3df5"));
   });
 
-  it("creates no watchers without an element", () => {
+  it("creates no watchers for hex and oklch literals", () => {
     const dom = fakeDom();
-    const colors = createColors(null, () => {});
-    colors.get("var(--t, #112233)");
+    const colors = createColors(dom.element, () => {});
+    colors.get("#112233");
+    colors.get("oklch(0.5 0.1 20)");
     expect(dom.observers).toHaveLength(0);
     expect(dom.counts.addListener).toBe(0);
-    expect(colors.get("var(--t, #112233)")).toEqual(hexToOklab("#112233"));
+    expect(dom.counts.matchMedia).toBe(0);
   });
 
-  it("observes documentElement and the dark query", () => {
-    const dom = fakeDom();
-    createColors(dom.element, () => {});
+  it("never touches the globals without an element", () => {
+    const calls = { observers: 0, matchMedia: 0 };
+    class CountingObserver {
+      constructor() {
+        calls.observers++;
+      }
+      observe() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("MutationObserver", CountingObserver);
+    vi.stubGlobal("matchMedia", () => {
+      calls.matchMedia++;
+      return { matches: false, addEventListener() {}, removeEventListener() {} };
+    });
+    try {
+      const colors = createColors(null, () => {});
+      expect(colors.get("var(--t, #112233)")).toEqual(hexToOklab("#112233"));
+      colors.dispose();
+      expect(calls).toEqual({ observers: 0, matchMedia: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("makes a 1x1 scratch canvas", () => {
+    const dom = fakeDom({ properties: { "--t": "red" } });
+    createColors(dom.element, () => {}).get("var(--t)");
+    expect(dom.sizes).toEqual([[1, 1]]);
+  });
+
+  it("keeps watched tokens when the cache fills up", () => {
+    const dom = fakeDom({ properties: { "--t": "#ffffff" } });
+    const onChange = vi.fn();
+    const colors = createColors(dom.element, onChange);
+    colors.get("var(--t)");
+    for (let i = 0; i < 70; i++) colors.get(`#${(i + 1).toString(16).padStart(6, "0")}`);
+    dom.setProperty("--t", "#000000");
+    dom.mutate();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(colors.get("var(--t)")).toEqual(hexToOklab("#000000"));
+  });
+
+  it("watches only once tokens are cached", () => {
+    const dom = fakeDom({ properties: { "--a": "#ffffff", "--b": "#000000" } });
+    const colors = createColors(dom.element, () => {});
+    expect(dom.observers).toHaveLength(0);
+    colors.get("var(--a)");
     expect(dom.observers).toHaveLength(1);
     expect(dom.observers[0]?.target).toBe(dom.documentElement);
     expect(dom.observers[0]?.options).toEqual({
@@ -217,6 +264,38 @@ describe("createColors", () => {
     });
     expect(dom.queries).toEqual(["(prefers-color-scheme: dark)"]);
     expect(dom.counts.addListener).toBe(1);
+    colors.get("var(--b)");
+    expect(dom.observers).toHaveLength(1);
+    expect(dom.counts.addListener).toBe(1);
+  });
+
+  it("unwatches when the element is disconnected", () => {
+    const dom = fakeDom({ properties: { "--t": "#ffffff" } });
+    const colors = createColors(dom.element, () => {});
+    colors.get("var(--t)");
+    dom.setConnected(false);
+    dom.mutate();
+    expect(dom.observers[0]?.disconnected).toBe(1);
+    expect(dom.counts.removeListener).toBe(1);
+  });
+
+  it("unwatches on dispose after a token", () => {
+    const dom = fakeDom({ properties: { "--t": "#ffffff" } });
+    const colors = createColors(dom.element, () => {});
+    colors.get("var(--t)");
+    colors.dispose();
+    expect(dom.observers[0]?.disconnected).toBe(1);
+    expect(dom.counts.removeListener).toBe(1);
+    colors.get("var(--t)");
+    expect(dom.observers).toHaveLength(1);
+  });
+
+  it("draws black for colours that are not strings", () => {
+    const colors = createColors(null, () => {});
+    for (const bad of [undefined, null, 42, ["x"]]) {
+      expect(colors.get(bad as unknown as string)).toEqual([0, 0, 0]);
+    }
+    expect(colorToOklab(undefined as unknown as string)).toBeNull();
   });
 
   it("calls onChange once when a token changed", () => {
@@ -307,6 +386,16 @@ describe("createColors", () => {
     const dom = fakeDom({ properties: { "--t": "red" }, noContext: true });
     const colors = createColors(dom.element, () => {});
     expect(colors.get("var(--t)")).toEqual([0, 0, 0]);
+  });
+});
+
+describe("token lightness", () => {
+  it("clamps the lightness the same way for the render and resolveConfig", () => {
+    const dom = fakeDom({ properties: { "--a": "color(xyz 2 2 2)" } });
+    const lab = colorToOklab("var(--a)", dom.element);
+    expect(lab?.[0]).toBe(1);
+    const resolved = resolveConfig({ ...DEFAULT_CONFIG, palette: ["var(--a)", "#fff"] }, dom.element);
+    expect(parseOklch(resolved.palette[0] as string)?.[0]).toBe(1);
   });
 });
 

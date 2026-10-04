@@ -59,6 +59,7 @@ export function fakeDom(options: DomOptions = {}) {
   };
   const observers: FakeObserver[] = [];
   const queries: string[] = [];
+  const sizes: [number, number][] = [];
   const listeners = new Set<() => void>();
 
   const media = {
@@ -148,7 +149,15 @@ export function fakeDom(options: DomOptions = {}) {
     documentElement,
     createElement(_tag: string) {
       counts.createElement++;
-      return { getContext: (_kind: string) => (options.noContext ? null : makeContext()) };
+      const created = {
+        width: 300,
+        height: 150,
+        getContext: (_kind: string) => {
+          sizes.push([created.width, created.height]);
+          return options.noContext ? null : makeContext();
+        },
+      };
+      return created;
     },
     querySelector(_selector: string) {
       return state.meta === null ? null : { content: state.meta };
@@ -169,6 +178,7 @@ export function fakeDom(options: DomOptions = {}) {
     counts,
     observers,
     queries,
+    sizes,
     media,
     state,
     setProperty(name: string, value: string) {

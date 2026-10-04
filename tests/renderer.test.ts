@@ -141,6 +141,25 @@ function expectColour(uploads: Upload[], hex: string): void {
   expect(last(uploads, "u_background")).toEqual(expected);
 }
 
+describe("createRenderer with colours that are not strings", () => {
+  it("draws black and does not throw", () => {
+    const { renderer, uploads } = harness();
+    const config = {
+      ...DEFAULT_CONFIG,
+      palette: [null, undefined, 42, "#fff"],
+      background: null,
+      shape: "mesh",
+      mesh: [[0.5, 0.5]],
+    } as unknown as GradientConfig;
+    expect(() => renderer.render(config, 0)).not.toThrow();
+    const palette = last(uploads, "u_palette");
+    expect(palette.slice(0, 9)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(palette.slice(9, 12)).toEqual(Array.from(Float32Array.from(hexToOklab("#fff"))));
+    expect(last(uploads, "u_background")).toEqual([0, 0, 0]);
+    expect(last(uploads, "u_meshColors").slice(0, 3)).toEqual([0, 0, 0]);
+  });
+});
+
 describe("createRenderer colour tokens", () => {
   it("uploads the token's Oklab", () => {
     const { dom, renderer, uploads } = withDom({ properties: { "--c": "#ff0000" } });
@@ -180,12 +199,15 @@ describe("createRenderer colour tokens", () => {
     expectColour(uploads, "#0000ff");
   });
 
-  it("does not draw on a theme change before any render", () => {
-    const { dom, gl } = withDom({ properties: { "--c": "#ff0000" } });
-    dom.setProperty("--c", "#00ff00");
-    dom.observers[0]?.trigger();
-    dom.media.fire();
-    expect(gl.draws()).toBe(0);
+  it("watches nothing until a token is drawn", () => {
+    const { dom, renderer } = withDom({ properties: { "--c": "#ff0000" } });
+    expect(dom.observers).toHaveLength(0);
+    renderer.render({ ...DEFAULT_CONFIG, palette: ["#ff0000", "oklch(0.5 0.1 20)"] }, 0);
+    expect(dom.observers).toHaveLength(0);
+    expect(dom.counts.addListener).toBe(0);
+    renderer.render(tokenConfig(), 0);
+    expect(dom.observers).toHaveLength(1);
+    expect(dom.counts.addListener).toBe(1);
   });
 
   it("lets go of the observer and the listener on dispose", () => {

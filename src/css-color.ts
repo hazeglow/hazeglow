@@ -6,6 +6,7 @@ const NAME = /^--[A-Za-z0-9_-]+$/;
 const SPACE = /[ \t\n\r\f]+/;
 const HEX_ALPHA = /^#(?:[0-9a-f]{4}|[0-9a-f]{8})$/i;
 const NONE = /^none$/i;
+const UNSAFE = /[^\t\n\f\r\x20-\x7e]/;
 const MAX_DEPTH = 8;
 
 const XYZ_TO_SRGB = [
@@ -46,7 +47,9 @@ function component(token: string, percent: number): number | null {
   if (NONE.test(token)) return 0;
   if (token.endsWith("%")) {
     const body = token.slice(0, -1);
-    return NUMBER.test(body) ? (Number(body) / 100) * percent : null;
+    if (!NUMBER.test(body)) return null;
+    const scaled = (Number(body) / 100) * percent;
+    return Number.isFinite(scaled) ? scaled : null;
   }
   if (!NUMBER.test(token)) return null;
   const value = Number(token);
@@ -61,13 +64,15 @@ function hue(token: string): number | null {
   const value = Number(body);
   if (!Number.isFinite(value)) return null;
   const name = unit ? unit[0].toLowerCase() : "deg";
-  if (name === "deg") return (value * Math.PI) / 180;
-  if (name === "grad") return (value * Math.PI) / 200;
-  if (name === "turn") return value * 2 * Math.PI;
-  return value;
+  let radians = value;
+  if (name === "deg") radians = (value * Math.PI) / 180;
+  else if (name === "grad") radians = (value * Math.PI) / 200;
+  else if (name === "turn") radians = value * 2 * Math.PI;
+  return Number.isFinite(radians) ? radians : null;
 }
 
 function call(text: string): { name: string; inner: string } | null {
+  if (UNSAFE.test(text)) return null;
   const open = text.indexOf("(");
   if (open < 0 || !text.endsWith(")")) return null;
   return { name: text.slice(0, open).toLowerCase(), inner: text.slice(open + 1, -1) };
@@ -111,6 +116,7 @@ export function parseOklch(text: string): RGB | null {
 }
 
 export function parseVar(text: string): { name: string; fallback: string | null } | null {
+  if (UNSAFE.test(text)) return null;
   if (text.slice(0, 4).toLowerCase() !== "var(" || !text.endsWith(")")) return null;
   const inner = text.slice(4, -1);
   const comma = inner.indexOf(",");

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, MAX_STOPS, parseConfig } from "../src/config";
+import { encodeConfig } from "../src/encode";
 
 describe("parseConfig", () => {
   it("returns the default config for non-object input", () => {
@@ -276,5 +277,21 @@ describe("parseConfig colours", () => {
   it("survives a deeply nested variable", () => {
     const deep = "var(--a, ".repeat(10000) + "#fff" + ")".repeat(10000);
     expect(parseConfig({ background: deep }).background).toBe(DEFAULT_CONFIG.background);
+  });
+
+  it("never produces a config that encodeConfig cannot encode", () => {
+    const texts = [
+      "oklch(\u3000 0.5 0.1 20)",
+      "var(\u3000--a)",
+      "var(--a,\ufeff#fff)",
+      "oklch(0.5 0.1 20 /\u00a00.5)",
+      "oklch(0.5\v0.1 20)",
+      "oklch(0.5 0.1 20)",
+      "var(--a, #fff)",
+    ];
+    for (const text of texts) {
+      const config = parseConfig({ palette: [text, "#fff"], background: text, mesh: [[0.5, 0.5, text]] });
+      expect(() => encodeConfig(config)).not.toThrow();
+    }
   });
 });
