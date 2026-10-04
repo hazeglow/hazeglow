@@ -1,3 +1,3 @@
-export { Afterglow } from "./Afterglow";
-export type { AfterglowHandle, AfterglowProps } from "./Afterglow";
+export { Hazeglow } from "./Hazeglow";
+export type { HazeglowHandle, HazeglowProps } from "./Hazeglow";
 export * from "./core";

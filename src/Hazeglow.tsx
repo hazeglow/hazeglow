@@ -22,11 +22,11 @@ import {
   type Renderer,
 } from "./core";
 
-export interface AfterglowHandle {
+export interface HazeglowHandle {
   getTime(): number;
 }
 
-export interface AfterglowProps {
+export interface HazeglowProps {
   config: GradientConfig;
   className?: string;
   style?: CSSProperties;
@@ -53,7 +53,7 @@ function usePrefersReducedMotion(): boolean {
   );
 }
 
-export const Afterglow = forwardRef<AfterglowHandle, AfterglowProps>(function Afterglow(
+export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeglow(
   { config, className, style, onUnsupported },
   ref,
 ) {
