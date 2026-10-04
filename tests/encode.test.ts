@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG } from "../src/config";
+import { DEFAULT_CONFIG, parseConfig } from "../src/config";
 import { decodeConfig, encodeConfig } from "../src/encode";
 import { presets } from "../src/presets";
 import { randomConfig } from "../src/random";
@@ -16,6 +16,20 @@ describe("encodeConfig / decodeConfig", () => {
       const config = randomConfig(seed);
       expect(decodeConfig(encodeConfig(config))).toEqual(config);
     }
+  });
+
+  it("round-trips oklch and var colours unchanged", () => {
+    const config = parseConfig({
+      ...DEFAULT_CONFIG,
+      shape: "mesh",
+      palette: ["oklch(0.7 0.15 200)", "var(--brand, #6a3df5)", "#abc"],
+      background: "var(--surface, oklch(0.2 0.02 270))",
+      mesh: [[0.3, 0.4, "var(--m)"], [0.6, 0.7, "oklch(70% 0.1 20deg)"]],
+    });
+    const encoded = encodeConfig(config);
+    expect(encoded).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(decodeConfig(encoded)).toEqual(config);
+    expect(encodeConfig(decodeConfig(encoded))).toBe(encoded);
   });
 
   it("gives the same link before and after a round trip, so a reload does not rewrite the url", () => {

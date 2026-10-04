@@ -16,6 +16,8 @@ export { presets } from "./presets";
 export { randomConfig, randomMesh, mulberry32 } from "./random";
 export { isHex, parseHex, toHex, srgbToLinear, linearToSrgb, linearToOklab, hexToOklab } from "./color";
 export type { RGB } from "./color";
+export { isColor } from "./css-color";
+export { colorToOklab, resolveConfig } from "./tokens";
 export { createRenderer } from "./renderer";
 export type { Renderer } from "./renderer";
 export { IDLE_POINTER, stepPointer, isSettled } from "./pointer";

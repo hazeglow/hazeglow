@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG, MAX_STOPS, parseConfig } from "../src/config";
+import { encodeConfig } from "../src/encode";
 
 describe("parseConfig", () => {
   it("returns the default config for non-object input", () => {
@@ -227,5 +228,70 @@ describe("parseConfig hover", () => {
 
   it("keeps the mode of a config saved before modes existed as pull", () => {
     expect(parseConfig({ hover: 0.7 })).toMatchObject({ hover: 0.7, hoverMode: "pull" });
+  });
+});
+
+describe("parseConfig colours", () => {
+  const colourful = {
+    palette: ["#abc", "oklch(0.7 0.15 200)", "var(--brand)", "var(--a, oklch(0.5 0.1 20))"],
+    background: "var(--surface, #000)",
+    mesh: [
+      [0.2, 0.8, "oklch(0.7 0.1 200)"],
+      [0.1, 0.1, "var(--m, #fff)"],
+    ],
+  };
+
+  it("keeps oklch and var colours as given", () => {
+    expect(parseConfig(colourful)).toMatchObject(colourful);
+  });
+
+  it("falls back to the default stop for an invalid colour", () => {
+    const palette = ["oklch(0.5 0.1)", "var(--a, red)", " oklch(0.5 0.1 20)", "rgb(1,2,3)"];
+    expect(parseConfig({ palette }).palette).toEqual(DEFAULT_CONFIG.palette.slice(0, 4));
+  });
+
+  it("falls back to the default background for an invalid colour", () => {
+    for (const background of ["oklch(0.5)", "var(red)", "red", "var(--a, blue)"]) {
+      expect(parseConfig({ background }).background).toBe(DEFAULT_CONFIG.background);
+    }
+  });
+
+  it("still drops mesh points with an invalid colour", () => {
+    const mesh = [
+      [0.5, 0.5, "oklch(0.5 0.1)"],
+      [0.5, 0.5, "var(red)"],
+      [0.5, 0.5, "red"],
+      [0.2, 0.8, "oklch(0.7 0.1 200)"],
+      [0.1, 0.1, "var(--m, #fff)"],
+    ];
+    expect(parseConfig({ mesh }).mesh).toEqual([
+      [0.2, 0.8, "oklch(0.7 0.1 200)"],
+      [0.1, 0.1, "var(--m, #fff)"],
+    ]);
+  });
+
+  it("keeps the key order", () => {
+    expect(Object.keys(parseConfig(colourful))).toEqual(Object.keys(DEFAULT_CONFIG));
+  });
+
+  it("survives a deeply nested variable", () => {
+    const deep = "var(--a, ".repeat(10000) + "#fff" + ")".repeat(10000);
+    expect(parseConfig({ background: deep }).background).toBe(DEFAULT_CONFIG.background);
+  });
+
+  it("never produces a config that encodeConfig cannot encode", () => {
+    const texts = [
+      "oklch(\u3000 0.5 0.1 20)",
+      "var(\u3000--a)",
+      "var(--a,\ufeff#fff)",
+      "oklch(0.5 0.1 20 /\u00a00.5)",
+      "oklch(0.5\v0.1 20)",
+      "oklch(0.5 0.1 20)",
+      "var(--a, #fff)",
+    ];
+    for (const text of texts) {
+      const config = parseConfig({ palette: [text, "#fff"], background: text, mesh: [[0.5, 0.5, text]] });
+      expect(() => encodeConfig(config)).not.toThrow();
+    }
   });
 });

@@ -1,8 +1,8 @@
-import { hexToOklab } from "./color";
 import { EFFECTS, MAX_MESH_POINTS, MAX_STOPS, MOTIONS, SHAPES, type GradientConfig } from "./config";
 import { IDLE_POINTER, type PointerState } from "./pointer";
 import { mulberry32 } from "./random";
 import { VERTEX_SHADER, fragmentShader } from "./shader";
+import { createColors } from "./tokens";
 
 export interface Renderer {
   readonly maxSize: number;
@@ -101,17 +101,20 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
   const palette = new Float32Array(MAX_STOPS * 3);
   const meshPoints = new Float32Array(MAX_MESH_POINTS * 2);
   const meshColors = new Float32Array(MAX_MESH_POINTS * 3);
+  const colors = createColors("ownerDocument" in canvas ? canvas : null, () => {
+    if (last) render(last.config, last.time, last.pointer);
+  });
 
   function render(config: GradientConfig, time: number, pointer: PointerState = IDLE_POINTER): void {
     last = { config, time, pointer };
     if (!program || gl.isContextLost()) return;
     const stops = config.palette.slice(0, MAX_STOPS);
-    stops.forEach((stop, index) => palette.set(hexToOklab(stop), index * 3));
+    stops.forEach((stop, index) => palette.set(colors.get(stop), index * 3));
     const mesh = config.mesh.slice(0, MAX_MESH_POINTS);
     mesh.forEach(([x, y, color], index) => {
       meshPoints[index * 2] = x;
       meshPoints[index * 2 + 1] = y;
-      meshColors.set(hexToOklab(color), index * 3);
+      meshColors.set(colors.get(color), index * 3);
     });
 
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -136,7 +139,7 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
     gl.uniform1f(uniforms.u_grain, config.grain);
     gl.uniform3fv(uniforms.u_palette, palette);
     gl.uniform1i(uniforms.u_paletteCount, Math.max(1, stops.length));
-    gl.uniform3fv(uniforms.u_background, hexToOklab(config.background));
+    gl.uniform3fv(uniforms.u_background, colors.get(config.background));
     gl.uniform2fv(uniforms.u_meshPoints, meshPoints);
     gl.uniform3fv(uniforms.u_meshColors, meshColors);
     gl.uniform1i(uniforms.u_meshCount, mesh.length);
@@ -177,6 +180,7 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
       if (canvas.height !== nextHeight) canvas.height = nextHeight;
     },
     dispose() {
+      colors.dispose();
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       if (program) gl.deleteProgram(program);

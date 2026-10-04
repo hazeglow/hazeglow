@@ -1,6 +1,6 @@
 # hazeglow
 
-Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. One WebGL2 fragment shader. Zero dependencies. ~10kb gzipped. MIT.
+Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. One WebGL2 fragment shader. Zero dependencies. ~13kb gzipped. MIT.
 
 **Design your own:** https://hazeglow.dev/generator
 
@@ -107,7 +107,7 @@ Start from one and override what you need:
 
 ## Config reference
 
-Positions and sizes are fractions of the canvas: `[0, 0]` is top left, `[1, 1]` bottom right. Colours are hex, `#rgb` or `#rrggbb`, blended in Oklab so the steps stay clean.
+Positions and sizes are fractions of the canvas: `[0, 0]` is top left, `[1, 1]` bottom right. Colours are hex, `oklch()` or a CSS variable, blended in Oklab so the steps stay clean. See [Colours](#colours).
 
 | Field           | Type / range                                                           | What it does                                                                  |
 | --------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -137,6 +137,50 @@ Positions and sizes are fractions of the canvas: `[0, 0]` is top left, `[1, 1]` 
 | `effectAmount`  | 0 to 1                                                                 | Effect strength.                                                              |
 
 The lists and limits are exported, so you can build your own controls: `SHAPES`, `MOTIONS`, `EFFECTS`, `HOVER_MODES`, `RANGES`, `MIN_STOPS`, `MAX_STOPS`, `MAX_MESH_POINTS`, `DEFAULT_CONFIG`.
+
+## Colours
+
+`palette`, `background` and the `mesh` points take any mix of:
+
+- **Hex**: `#rgb` or `#rrggbb`.
+- **OKLCH**: `oklch(L C H)`. `L` is 0 to 1 or a percentage, `C` the chroma, `H` the hue in degrees. An alpha after `/` is ignored. Written the way CSS writes it, minus `calc()` and relative colours.
+- **CSS variables**: `var(--name)` or `var(--name, fallback)`. The fallback is hex, OKLCH or another `var()`.
+
+```tsx
+<Hazeglow
+  config={{
+    ...presets.dusk,
+    palette: ["var(--brand)", "oklch(0.72 0.16 250)", "var(--accent, #f59a22)"],
+    background: "var(--surface, #000000)",
+  }}
+/>
+```
+
+The gradient blends in Oklab, so OKLCH colours go in as they are. Colours outside sRGB are clipped to sRGB after blending. Display P3 output is not supported yet.
+
+### Theme tokens
+
+Variables are read from the canvas, so a variable set on any ancestor works, scoped themes included. It can hold any colour the browser understands: hex, `rgb()`, `hsl()`, `oklch()`, `lab()`, `color()`, `color-mix()`, `light-dark()`, a named colour. Build tools that rewrite `oklch()` to `lab()` are fine.
+
+A missing variable, or one that doesn't hold a colour, uses the fallback. With no fallback it draws black, so give one.
+
+The gradient picks up new colours when `prefers-color-scheme` changes or when the `class`, `style` or `data-theme` attribute on `<html>` changes. That's how most theme switchers work. It redraws even when paused or under reduced motion.
+
+Theme switched some other way, like a class on `<body>`? Resolve the variables yourself after the switch and pass plain colours. Here `theme` is whatever state your switcher changes:
+
+```tsx
+const [resolved, setResolved] = useState(config);
+useEffect(() => setResolved(resolveConfig(config, document.body)), [config, theme]);
+
+<Hazeglow config={resolved} />;
+```
+
+`resolveConfig(config, element)` reads the variables from `element` and returns a copy where each `var()` is the colour it holds: as written for hex and OKLCH, as `oklch()` for anything else. Use it too:
+
+- before `encodeConfig`, so a share link carries colours instead of your variable names,
+- for a worker or the server, where there's no DOM and variables fall back. Resolve on the main thread and send the result.
+
+`isColor(value)` checks the syntax. `colorToOklab(colour, element?)` returns the colour as Oklab `[L, a, b]`, or `null`.
 
 ## Hover
 
@@ -173,7 +217,7 @@ if (renderer) {
 
 To animate, call `render` from `requestAnimationFrame` with a growing `time`. To save a frame, read the canvas (`toBlob`, `drawImage`) right after `render`, in the same task. The drawing buffer isn't kept between frames.
 
-Everything on `/core` is also in the main entry: `parseConfig`, `encodeConfig`, `decodeConfig`, `presets`, `randomConfig`, `randomMesh`, `mulberry32`, the colour helpers (`isHex`, `parseHex`, `toHex`, `srgbToLinear`, `linearToSrgb`, `linearToOklab`, `hexToOklab`) and the pointer easing the component uses (`IDLE_POINTER`, `stepPointer`, `isSettled`).
+Everything on `/core` is also in the main entry: `parseConfig`, `encodeConfig`, `decodeConfig`, `presets`, `randomConfig`, `randomMesh`, `mulberry32`, the colour helpers (`isColor`, `colorToOklab`, `resolveConfig`, `isHex`, `parseHex`, `toHex`, `srgbToLinear`, `linearToSrgb`, `linearToOklab`, `hexToOklab`) and the pointer easing the component uses (`IDLE_POINTER`, `stepPointer`, `isSettled`).
 
 ## Limits
 

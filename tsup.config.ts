@@ -66,5 +66,7 @@ export default defineConfig({
     const renderer = await bundleFor("createRenderer");
     if (!helpers.includes("btoa") || !renderer.includes("#version 300 es")) throw new Error("the tree-shaking check is not looking at real bundles");
     if (helpers.includes("#version 300 es")) throw new Error("the shader must drop out of a bundle that never creates a renderer");
+    if (!renderer.includes("getComputedStyle")) throw new Error("the tree-shaking check is not looking at real bundles");
+    if (/getComputedStyle|display-p3|48657094864821626/.test(helpers)) throw new Error("colour tokens must drop out of a bundle that only parses configs");
   },
 });
