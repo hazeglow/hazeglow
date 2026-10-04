@@ -4,7 +4,7 @@ Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas
 
 **Design your own:** https://hazeglow.dev/generator
 
-![The six built-in presets: dusk, pearl, ember, horizon, ultraviolet and candy](./docs/presets.jpg)
+![Six gradients made with hazeglow: dither tide, ivory, deep reef, ASCII aurora, moss and borealis](https://raw.githubusercontent.com/hazeglow/hazeglow/main/docs/cover.jpg)
 
 ## Install
 
@@ -93,7 +93,7 @@ For share links, `encodeConfig(config)` gives a URL-safe string and `decodeConfi
 
 ## Presets
 
-Six of them, the ones in the picture, left to right and top to bottom: `dusk`, `pearl`, `ember`, `horizon`, `ultraviolet`, `candy`.
+Six of them: `dusk`, `pearl`, `ember`, `horizon`, `ultraviolet`, `candy`. The configs behind the picture at the top are in [`docs/cover.json`](https://github.com/hazeglow/hazeglow/blob/main/docs/cover.json).
 
 Start from one and override what you need:
 
