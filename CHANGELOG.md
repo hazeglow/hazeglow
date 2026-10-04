@@ -1,5 +1,11 @@
 # hazeglow
 
+## 0.3.1
+
+### Patch Changes
+
+- b8113b7: The README has a new cover image, linked so it shows on npm as well as GitHub.
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "hazeglow",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Soft, grainy, glowing gradients for React. One WebGL2 fragment shader, zero dependencies.",
   "keywords": [
     "react",
