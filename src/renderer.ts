@@ -51,7 +51,7 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS) && !gl.isContextLost()) {
-    console.error("[afterglow] shader compile failed:", gl.getShaderInfoLog(shader));
+    console.error("[hazeglow] shader compile failed:", gl.getShaderInfoLog(shader));
     gl.deleteShader(shader);
     return null;
   }
@@ -69,7 +69,7 @@ function link(gl: WebGL2RenderingContext): WebGLProgram | null {
   gl.deleteShader(vertex);
   gl.deleteShader(fragment);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS) && !gl.isContextLost()) {
-    console.error("[afterglow] program link failed:", gl.getProgramInfoLog(program));
+    console.error("[hazeglow] program link failed:", gl.getProgramInfoLog(program));
     gl.deleteProgram(program);
     return null;
   }

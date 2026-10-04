@@ -38,7 +38,7 @@ describe("public api", () => {
   });
 
   it("exposes the component and the whole engine from the main entry", () => {
-    expect(Object.keys(everything).sort()).toEqual(["Afterglow", ...ENGINE].sort());
+    expect(Object.keys(everything).sort()).toEqual(["Hazeglow", ...ENGINE].sort());
   });
 
   it("hands out the same engine from both entries", () => {

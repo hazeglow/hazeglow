@@ -1,15 +1,15 @@
-# @scoobynko/afterglow
+# hazeglow
 
 Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. One WebGL2 fragment shader. Zero dependencies. ~10kb gzipped. MIT.
 
-**Design your own:** https://www.jakubsalmik.com/afterglow
+**Design your own:** https://hazeglow.dev/generator
 
 ![The six built-in presets: dusk, pearl, ember, horizon, ultraviolet and candy](./docs/presets.jpg)
 
 ## Install
 
 ```bash
-npm install @scoobynko/afterglow
+npm install hazeglow
 ```
 
 React 18 or 19.
@@ -17,12 +17,12 @@ React 18 or 19.
 ## Usage
 
 ```tsx
-import { Afterglow, presets } from "@scoobynko/afterglow";
+import { Hazeglow, presets } from "hazeglow";
 
 export function Hero() {
   return (
     <div style={{ height: 480 }}>
-      <Afterglow config={presets.dusk} />
+      <Hazeglow config={presets.dusk} />
     </div>
   );
 }
@@ -30,7 +30,7 @@ export function Hero() {
 
 The canvas fills its parent, so give the parent a size. No CSS to import.
 
-Works in the Next.js App Router as is. `Afterglow` is a client component you can render from a server component.
+Works in the Next.js App Router as is. `Hazeglow` is a client component you can render from a server component.
 
 ### Props
 
@@ -40,16 +40,16 @@ Works in the Next.js App Router as is. `Afterglow` is a client component you can
 | `className`     | `string`               | Class for the canvas.                                            |
 | `style`         | `CSSProperties`        | Merged over `display: block; width: 100%; height: 100%`.         |
 | `onUnsupported` | `() => void`           | Called once when there is no WebGL2 on a GPU. Show a fallback.   |
-| `ref`           | `Ref<AfterglowHandle>` | `ref.current.getTime()` returns the animation clock in seconds.  |
+| `ref`           | `Ref<HazeglowHandle>`  | `ref.current.getTime()` returns the animation clock in seconds.  |
 
 The canvas is `aria-hidden`. It's decoration, so your content goes next to it or on top.
 
 ## Design a gradient
 
-Don't write the config by hand. Shape the gradient at https://www.jakubsalmik.com/afterglow, copy the JSON, paste it as `config`.
+Don't write the config by hand. Shape the gradient at https://hazeglow.dev/generator, copy the JSON, paste it as `config`.
 
 ```tsx
-import { Afterglow, type GradientConfig } from "@scoobynko/afterglow";
+import { Hazeglow, type GradientConfig } from "hazeglow";
 
 const config: GradientConfig = {
   version: 1,
@@ -78,15 +78,15 @@ const config: GradientConfig = {
   effectAmount: 0.5,
 };
 
-<Afterglow config={config} />;
+<Hazeglow config={config} />;
 ```
 
 Config from a CMS, a URL or a `.json` file? Run it through `parseConfig` first. It never throws. Missing or invalid fields fall back to the defaults, numbers get clamped.
 
 ```tsx
-import { Afterglow, parseConfig } from "@scoobynko/afterglow";
+import { Hazeglow, parseConfig } from "hazeglow";
 
-<Afterglow config={parseConfig(untrusted)} />;
+<Hazeglow config={parseConfig(untrusted)} />;
 ```
 
 For share links, `encodeConfig(config)` gives a URL-safe string and `decodeConfig(string)` turns it back.
@@ -98,7 +98,7 @@ Six of them, the ones in the picture, left to right and top to bottom: `dusk`, `
 Start from one and override what you need:
 
 ```tsx
-<Afterglow config={{ ...presets.horizon, motion: "breathe", grain: 0.5 }} />
+<Hazeglow config={{ ...presets.horizon, motion: "breathe", grain: 0.5 }} />
 ```
 
 `presets` is a `Record<string, GradientConfig>`. With `noUncheckedIndexedAccess` on, write `presets.dusk!`.
@@ -143,7 +143,7 @@ The lists and limits are exported, so you can build your own controls: `SHAPES`,
 Set `hover` above `0`. The gradient follows the pointer and eases back when it leaves.
 
 ```tsx
-<Afterglow config={{ ...presets.dusk, hover: 0.6, hoverMode: "pull" }} />
+<Hazeglow config={{ ...presets.dusk, hover: 0.6, hoverMode: "pull" }} />
 ```
 
 - Pointer events, so mouse, pen and touch all drive it.
@@ -155,7 +155,7 @@ Set `hover` above `0`. The gradient follows the pointer and eases back when it l
 `/core` is the engine with no React import. Use it in Vue, Svelte, plain JavaScript, a worker with an `OffscreenCanvas`, or to render one frame for an image export.
 
 ```ts
-import { createRenderer, presets } from "@scoobynko/afterglow/core";
+import { createRenderer, presets } from "hazeglow/core";
 
 const canvas = document.querySelector("canvas")!;
 const renderer = createRenderer(canvas);
@@ -178,12 +178,23 @@ Everything on `/core` is also in the main entry: `parseConfig`, `encodeConfig`, 
 ## Limits
 
 - **Needs WebGL2 on a GPU.** Software rendering is refused on purpose. It took 9 to 10 seconds to start. No GPU means an empty canvas and an `onUnsupported` call, so keep a CSS background behind it.
-- **About 16 per page.** Browsers cap live WebGL contexts at roughly 16 and each `Afterglow` uses one. Past the cap the oldest get dropped.
+- **About 16 per page.** Browsers cap live WebGL contexts at roughly 16 and each `Hazeglow` uses one. Past the cap the oldest get dropped.
 - **Reduced motion means no motion.** Under `prefers-reduced-motion: reduce` you get a still frame and no hover.
 - **Tested in Chrome only.** Safari, Firefox and real phones are untested.
 - **Nothing in server-rendered HTML.** The canvas is empty until JavaScript runs.
 
 To stay light, the loop pauses while the canvas is off screen or the tab is hidden, device pixel ratio is capped at 2, and the loop never re-renders React.
+
+## Renamed from @scoobynko/afterglow
+
+Same engine, new name. Every config renders exactly as before, so saved configs and share links keep working.
+
+```diff
+- import { Afterglow } from "@scoobynko/afterglow";
++ import { Hazeglow } from "hazeglow";
+```
+
+Swap the package with `npm uninstall @scoobynko/afterglow && npm install hazeglow`. The types are now `HazeglowProps` and `HazeglowHandle`, and the engine lives at `hazeglow/core`.
 
 ## Contributing
 

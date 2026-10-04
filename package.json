@@ -1,5 +1,5 @@
 {
-  "name": "@scoobynko/afterglow",
+  "name": "hazeglow",
   "version": "0.1.1",
   "description": "Soft, grainy, glowing gradients for React. One WebGL2 fragment shader, zero dependencies.",
   "keywords": [
@@ -17,9 +17,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/scoobynko/afterglow.git"
+    "url": "git+https://github.com/hazeglow/hazeglow.git"
   },
-  "homepage": "https://www.jakubsalmik.com/afterglow",
+  "homepage": "https://hazeglow.dev",
+  "bugs": {
+    "url": "https://github.com/hazeglow/hazeglow/issues"
+  },
   "type": "module",
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",

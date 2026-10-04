@@ -1,4 +1,4 @@
-# @scoobynko/afterglow
+# hazeglow
 
 ## 0.1.1
 
