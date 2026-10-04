@@ -1,5 +1,11 @@
 # hazeglow
 
+## 0.2.0
+
+### Minor Changes
+
+- ea66609: Renamed from @scoobynko/afterglow: install hazeglow and import Hazeglow (was Afterglow). Every config renders exactly as before.
+
 ## 0.1.1
 
 ### Patch Changes
