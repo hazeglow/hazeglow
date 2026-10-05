@@ -32,13 +32,16 @@ function litPixels(bits: number): number {
   return bits.toString(2).replace(/0/g, "").length;
 }
 
-export function fragmentShader(): string {
-  const glyphs = GLYPH_ROWS.map(glyphBits).sort((a, b) => litPixels(a) - litPixels(b));
+function head(): string {
   return `#version 300 es
 precision highp float;
 precision highp int;
 
-uniform vec2 u_resolution;
+`;
+}
+
+function uniforms(): string {
+  return `uniform vec2 u_resolution;
 uniform float u_time;
 uniform float u_loop;
 uniform vec2 u_seed;
@@ -67,9 +70,11 @@ uniform float u_effectAmount;
 uniform vec2 u_pointer;
 uniform float u_pointerForce;
 
-out vec4 outColor;
+`;
+}
 
-const int SHAPE_BAND = 1;
+function constants(glyphs: number[]): string {
+  return `const int SHAPE_BAND = 1;
 const int SHAPE_BLOB = 2;
 const int SHAPE_RING = 3;
 const int SHAPE_MESH = 4;
@@ -93,7 +98,11 @@ const float TAU = 6.28318530718;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 const mat2 HALFTONE_ROTATION = mat2(0.70710678, -0.70710678, 0.70710678, 0.70710678);
 
-uint hash(uint x) {
+`;
+}
+
+function hashes(): string {
+  return `uint hash(uint x) {
   x ^= x >> 16;
   x *= 0x7feb352du;
   x ^= x >> 15;
@@ -102,7 +111,11 @@ uint hash(uint x) {
   return x;
 }
 
-uint hash3(ivec3 p) {
+`;
+}
+
+function noise(): string {
+  return `uint hash3(ivec3 p) {
   return hash(uint(p.x) + hash(uint(p.y) + hash(uint(p.z))));
 }
 
@@ -194,7 +207,11 @@ vec3 linearToSrgb(vec3 c) {
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
 }
 
-float grainHash(ivec2 p, uint salt) {
+`;
+}
+
+function grain(): string {
+  return `float grainHash(ivec2 p, uint salt) {
   return float(hash(uint(p.x) + hash(uint(p.y) + hash(u_grainSeed + salt)))) / 4294967295.0;
 }
 
@@ -224,7 +241,11 @@ float glyphBit(int glyph, ivec2 texel) {
   return float((glyph >> (texel.x + 5 * texel.y)) & 1);
 }
 
-vec3 meshColor(vec2 position, vec2 aspect, float breathe, float orbit) {
+`;
+}
+
+function gradient(): string {
+  return `vec3 meshColor(vec2 position, vec2 aspect, float breathe, float orbit) {
   if (u_meshCount == 0) return u_background;
   float sharpness = mix(3.0, 1.0, u_softness);
   vec3 sum = vec3(0.0);
@@ -319,7 +340,35 @@ vec3 gradientAt(vec2 pixel) {
   return linearToSrgb(oklabToLinear(lab));
 }
 
-vec3 applyEffect(vec2 pixel) {
+`;
+}
+
+function effectMain(): string {
+  return `void main() {
+  float shortSide = min(u_resolution.x, u_resolution.y);
+  vec3 color = applyEffect(vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y));
+
+  float cellSize = max(1.0, shortSide / 1080.0);
+  vec2 grainPosition = (gl_FragCoord.xy - 0.5) / cellSize;
+  float fineGrain = grainNoise(grainPosition, 0u) + grainNoise(grainPosition, 7u) - 1.0;
+  float coarseGrain = grainNoise(grainPosition * 0.5 + 100.0, 13u) - 0.5;
+  float luma = dot(color, LUMA);
+  float strength = u_grain * 0.14 * mix(0.3, 1.0, smoothstep(0.0, 0.2, luma));
+  color += (0.8 * fineGrain + 0.4 * coarseGrain) * strength;
+
+  outColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+}
+`;
+}
+
+function glyphCodes(): number[] {
+  return GLYPH_ROWS.map(glyphBits).sort((a, b) => litPixels(a) - litPixels(b));
+}
+
+export function fragmentShader(): string {
+  return head() + uniforms() + `out vec4 outColor;
+
+` + constants(glyphCodes()) + hashes() + noise() + grain() + gradient() + `vec3 applyEffect(vec2 pixel) {
   float scale = min(u_resolution.x, u_resolution.y) / 1080.0;
 
   if (u_effect == EFFECT_DITHER) {
@@ -378,19 +427,68 @@ vec3 applyEffect(vec2 pixel) {
   return gradientAt(pixel);
 }
 
-void main() {
-  float shortSide = min(u_resolution.x, u_resolution.y);
-  vec3 color = applyEffect(vec2(gl_FragCoord.x, u_resolution.y - gl_FragCoord.y));
+` + effectMain();
+}
 
-  float cellSize = max(1.0, shortSide / 1080.0);
-  vec2 grainPosition = (gl_FragCoord.xy - 0.5) / cellSize;
-  float fineGrain = grainNoise(grainPosition, 0u) + grainNoise(grainPosition, 7u) - 1.0;
-  float coarseGrain = grainNoise(grainPosition * 0.5 + 100.0, 13u) - 0.5;
-  float luma = dot(color, LUMA);
-  float strength = u_grain * 0.14 * mix(0.3, 1.0, smoothstep(0.0, 0.2, luma));
-  color += (0.8 * fineGrain + 0.4 * coarseGrain) * strength;
+export function cellShader(): string {
+  return head() + uniforms() + `out uvec4 outCell;
 
-  outColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+` + constants(glyphCodes()) + hashes() + noise() + gradient() + `void main() {
+  float scale = min(u_resolution.x, u_resolution.y) / 1080.0;
+  float cell = u_effect == EFFECT_ASCII ? max(7.0, u_effectSize * scale) : max(1.0, round(u_effectSize * scale));
+  vec2 id = floor(gl_FragCoord.xy);
+  outCell = uvec4(floatBitsToUint(gradientAt((id + 0.5) * cell)), 0u);
 }
 `;
+}
+
+export function compositeShader(): string {
+  return head() + uniforms() + `uniform highp usampler2D u_cells;
+
+out vec4 outColor;
+
+` + constants(glyphCodes()) + hashes() + grain() + `vec3 cellAt(vec2 id) {
+  return uintBitsToFloat(texelFetch(u_cells, ivec2(id), 0).rgb);
+}
+
+vec3 applyEffect(vec2 pixel) {
+  float scale = min(u_resolution.x, u_resolution.y) / 1080.0;
+
+  if (u_effect == EFFECT_DITHER) {
+    float cell = max(1.0, round(u_effectSize * scale));
+    vec2 id = floor(pixel / cell);
+    vec3 color = cellAt(id);
+    float steps = floor(mix(1.0, 7.0, u_effectAmount) + 0.5);
+    return floor(color * steps + bayer(ivec2(id))) / steps;
+  }
+
+  if (u_effect == EFFECT_ASCII) {
+    float cell = max(7.0, u_effectSize * scale);
+    vec2 id = floor(pixel / cell);
+    vec3 color = cellAt(id);
+    float peak = max(color.r, max(color.g, color.b));
+    float brightness = pow(clamp(mix(dot(color, LUMA), peak, 0.5), 0.0, 0.999), 0.75);
+    int index = int(floor(brightness * float(GLYPH_COUNT + 1)));
+    if (index == 0) return vec3(0.0);
+    int glyph = GLYPHS[index - 1];
+    float footprint = 7.0 / cell;
+    vec2 low = fract(pixel / cell) * 7.0 - 1.0 - 0.5 * footprint;
+    ivec2 texel = ivec2(floor(low));
+    vec2 spill = clamp((low + footprint - vec2(texel) - 1.0) / footprint, 0.0, 1.0);
+    float lit = mix(
+      mix(glyphBit(glyph, texel), glyphBit(glyph, texel + ivec2(1, 0)), spill.x),
+      mix(glyphBit(glyph, texel + ivec2(0, 1)), glyphBit(glyph, texel + ivec2(1, 1)), spill.x),
+      spill.y);
+    return mix(color, color / max(peak, 1e-3), u_effectAmount) * lit;
+  }
+
+  if (u_effect == EFFECT_PIXELATE) {
+    float cell = max(1.0, round(u_effectSize * scale));
+    return cellAt(floor(pixel / cell));
+  }
+
+  return vec3(0.0);
+}
+
+` + effectMain();
 }
