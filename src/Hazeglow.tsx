@@ -21,6 +21,7 @@ import {
   type PointerTarget,
   type Renderer,
 } from "./core";
+import { paceFrame } from "./frame";
 
 export interface HazeglowHandle {
   getTime(): number;
@@ -125,15 +126,19 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
     if (!running) return;
     let frame = 0;
     let previous = performance.now();
+    let paced = previous;
     const tick = (now: number) => {
+      frame = requestAnimationFrame(tick);
+      const next = paceFrame(paced, now);
+      if (next === null) return;
+      paced = next;
       const elapsed = Math.min((now - previous) / 1000, MAX_FRAME_SECONDS);
       previous = now;
       if (moving) timeRef.current += elapsed * configRef.current.speed;
       const target = reactive ? targetRef.current : { ...targetRef.current, inside: false };
       pointerRef.current = stepPointer(pointerRef.current, target, elapsed);
       rendererRef.current?.render(configRef.current, timeRef.current, pointerRef.current);
-      if (isSettled(pointerRef.current, target.inside)) engage(false);
-      frame = requestAnimationFrame(tick);
+      if (isSettled(pointerRef.current, target)) engage(false);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
@@ -152,6 +157,7 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
 
   const release = () => {
     targetRef.current = { ...targetRef.current, inside: false };
+    if (reactive) engage(true);
   };
 
   return (
