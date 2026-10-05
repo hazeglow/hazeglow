@@ -1,6 +1,6 @@
 # hazeglow
 
-Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. One WebGL2 fragment shader. Zero dependencies. ~13kb gzipped. MIT.
+Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. Drawn on the GPU with WebGL2. Zero dependencies. ~13kb gzipped. MIT.
 
 **Design your own:** https://hazeglow.dev/generator
 
@@ -213,7 +213,7 @@ if (renderer) {
 - `createRenderer(canvas)` returns `null` when there is no WebGL2 on a GPU.
 - `renderer.render(config, time, pointer?)` draws one frame. `time` is in seconds. Same config and time, same picture.
 - `renderer.resize(width, height)` sets the size in device pixels. `renderer.maxSize` is the largest side the GPU allows.
-- `renderer.dispose()` frees the shader program and the listeners.
+- `renderer.dispose()` frees its GPU resources and the listeners.
 
 To animate, call `render` from `requestAnimationFrame` with a growing `time`. To save a frame, read the canvas (`toBlob`, `drawImage`) right after `render`, in the same task. The drawing buffer isn't kept between frames.
 
@@ -227,7 +227,7 @@ Everything on `/core` is also in the main entry: `parseConfig`, `encodeConfig`, 
 - **Tested in Chrome only.** Safari, Firefox and real phones are untested.
 - **Nothing in server-rendered HTML.** The canvas is empty until JavaScript runs.
 
-To stay light, the loop draws at most 60 frames a second, pauses while the canvas is off screen or the tab is hidden, and stops once the gradient has caught up with a pointer resting on it. Device pixel ratio is capped at 2, and the loop never re-renders React.
+To stay light, the loop draws at most 60 frames a second, pauses while the canvas is off screen or the tab is hidden, and stops once the gradient has caught up with a pointer resting on it. Device pixel ratio is capped at 2, and the loop never re-renders React. Dither, ascii and pixelate work out the gradient once per cell, not once per pixel.
 
 ## Renamed from @scoobynko/afterglow
 
