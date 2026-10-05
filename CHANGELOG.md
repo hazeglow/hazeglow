@@ -1,5 +1,11 @@
 # hazeglow
 
+## 0.5.0
+
+### Minor Changes
+
+- 571aa6e: Dither, ascii and pixelate effects now compute the gradient once per cell instead of once per pixel. This cuts their GPU time per frame by up to about 90%, and the picture is unchanged.
+
 ## 0.4.0
 
 ### Minor Changes
