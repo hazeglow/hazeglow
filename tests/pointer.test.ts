@@ -78,3 +78,56 @@ describe("isSettled", () => {
     expect(isSettled({ x: 0.5, y: 0.5, force: 0.3 }, false)).toBe(false);
   });
 });
+
+describe("isSettled with a target", () => {
+  const at = { x: 0.3, y: 0.7, inside: true };
+  const away = { x: 0.3, y: 0.7, inside: false };
+
+  it("is settled outside with no force", () => {
+    expect(isSettled({ x: 0.3, y: 0.7, force: 0 }, away)).toBe(true);
+  });
+
+  it("is not settled outside while the force fades", () => {
+    expect(isSettled({ x: 0.3, y: 0.7, force: 0.3 }, away)).toBe(false);
+  });
+
+  it("is settled inside once force and position have caught up", () => {
+    expect(isSettled({ x: 0.3, y: 0.7, force: 0.9995 }, at)).toBe(true);
+  });
+
+  it("is not settled inside while the force is still rising", () => {
+    expect(isSettled({ x: 0.3, y: 0.7, force: 0.99 }, at)).toBe(false);
+  });
+
+  it("is not settled inside while the position is still catching up", () => {
+    expect(isSettled({ x: 0.31, y: 0.7, force: 0.9995 }, at)).toBe(false);
+  });
+
+  it("keeps the boolean form unchanged", () => {
+    expect(isSettled(IDLE_POINTER, false)).toBe(true);
+    expect(isSettled(IDLE_POINTER, true)).toBe(false);
+    expect(isSettled({ x: 0.5, y: 0.5, force: 0.3 }, false)).toBe(false);
+    expect(isSettled({ x: 0.5, y: 0.5, force: 1 }, true)).toBe(false);
+  });
+
+  it("settles on a resting pointer and settles back after it leaves", () => {
+    const rest = { x: 0.3, y: 0.7, inside: true };
+    let state: PointerState = IDLE_POINTER;
+    let steps = 0;
+    while (!isSettled(state, rest) && steps < 1000) {
+      state = stepPointer(state, rest, 1 / 60);
+      steps++;
+    }
+    expect(steps).toBeGreaterThanOrEqual(30);
+    expect(steps).toBeLessThanOrEqual(120);
+
+    const gone = { ...rest, inside: false };
+    steps = 0;
+    while (!isSettled(state, gone) && steps < 1000) {
+      state = stepPointer(state, gone, 1 / 60);
+      steps++;
+    }
+    expect(steps).toBeLessThanOrEqual(120);
+    expect(state.force).toBe(0);
+  });
+});

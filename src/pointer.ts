@@ -15,6 +15,7 @@ export const IDLE_POINTER: PointerState = { x: 0.5, y: 0.5, force: 0 };
 const FOLLOW_RATE = 10;
 const FORCE_RATE = 6;
 const REST = 0.002;
+const SETTLE = 0.001;
 
 export function approach(current: number, target: number, elapsed: number, rate: number): number {
   return current + (target - current) * (1 - Math.exp(-rate * elapsed));
@@ -33,6 +34,8 @@ export function stepPointer(state: PointerState, target: PointerTarget, elapsed:
   };
 }
 
-export function isSettled(state: PointerState, inside: boolean): boolean {
-  return !inside && state.force === 0;
+export function isSettled(state: PointerState, target: boolean | PointerTarget): boolean {
+  if (typeof target === "boolean") return !target && state.force === 0;
+  if (!target.inside) return state.force === 0;
+  return 1 - state.force < REST && Math.abs(state.x - target.x) < SETTLE && Math.abs(state.y - target.y) < SETTLE;
 }

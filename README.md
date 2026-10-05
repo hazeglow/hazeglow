@@ -227,7 +227,7 @@ Everything on `/core` is also in the main entry: `parseConfig`, `encodeConfig`, 
 - **Tested in Chrome only.** Safari, Firefox and real phones are untested.
 - **Nothing in server-rendered HTML.** The canvas is empty until JavaScript runs.
 
-To stay light, the loop pauses while the canvas is off screen or the tab is hidden, device pixel ratio is capped at 2, and the loop never re-renders React.
+To stay light, the loop draws at most 60 frames a second, pauses while the canvas is off screen or the tab is hidden, and stops once the gradient has caught up with a pointer resting on it. Device pixel ratio is capped at 2, and the loop never re-renders React.
 
 ## Renamed from @scoobynko/afterglow
 
