@@ -21,7 +21,8 @@ import {
   type PointerTarget,
   type Renderer,
 } from "./core";
-import { paceFrame } from "./frame";
+import { createStallWatch, paceFrame } from "./frame";
+import { MAX_RESTORES } from "./renderer";
 
 export interface HazeglowHandle {
   getTime(): number;
@@ -68,6 +69,7 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
   const engagedRef = useRef(false);
   const [visible, setVisible] = useState(true);
   const [engaged, setEngaged] = useState(false);
+  const [stalled, setStalled] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
   useImperativeHandle(ref, () => ({ getTime: () => timeRef.current }), []);
@@ -105,7 +107,18 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
     });
     intersectionObserver.observe(canvas);
 
+    let losses = 0;
+    const onContextLost = () => {
+      losses += 1;
+      if (losses > MAX_RESTORES) {
+        setStalled(true);
+        unsupportedRef.current?.();
+      }
+    };
+    canvas.addEventListener("webglcontextlost", onContextLost);
+
     return () => {
+      canvas.removeEventListener("webglcontextlost", onContextLost);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
       renderer.dispose();
@@ -120,14 +133,20 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
 
   const moving = config.motion !== "none" && !reducedMotion;
   const reactive = config.hover > 0 && !reducedMotion;
-  const running = visible && (moving || (reactive && engaged));
+  const running = visible && !stalled && (moving || (reactive && engaged));
 
   useEffect(() => {
     if (!running) return;
     let frame = 0;
     let previous = performance.now();
     let paced = previous;
+    const stall = createStallWatch();
     const tick = (now: number) => {
+      if (stall(now)) {
+        console.warn("[hazeglow] stopped animating: frames took longer than 100 ms, so this device draws a still frame instead.");
+        setStalled(true);
+        return;
+      }
       frame = requestAnimationFrame(tick);
       const next = paceFrame(paced, now);
       if (next === null) return;

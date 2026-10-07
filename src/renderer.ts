@@ -43,6 +43,10 @@ const UNIFORMS = [
   "u_pointerForce",
 ] as const;
 
+export const MAX_RESTORES = 1;
+const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|lavapipe|basic render|software/i;
+const GENERIC_RENDERER = "WebKit WebGL";
+
 type UniformName = (typeof UNIFORMS)[number];
 type Uniforms = Record<UniformName, WebGLUniformLocation | null>;
 
@@ -133,6 +137,14 @@ function deleteCells(gl: WebGL2RenderingContext, cells: Cells): void {
   gl.deleteFramebuffer(cells.framebuffer);
 }
 
+function rendererName(gl: WebGL2RenderingContext): string {
+  const reported: unknown = gl.getParameter(gl.RENDERER);
+  if (typeof reported === "string" && reported !== GENERIC_RENDERER) return reported;
+  const info = gl.getExtension("WEBGL_debug_renderer_info");
+  const unmasked: unknown = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : null;
+  return typeof unmasked === "string" ? unmasked : "";
+}
+
 export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Renderer | null {
   const acquired = canvas.getContext("webgl2", {
     alpha: false,
@@ -144,10 +156,15 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
   }) as WebGL2RenderingContext | null;
   if (!acquired) return null;
   const gl: WebGL2RenderingContext = acquired;
+  if (SOFTWARE_RENDERER.test(rendererName(gl))) {
+    gl.getExtension("WEBGL_lose_context")?.loseContext();
+    return null;
+  }
 
   let main = link(gl, fragmentShader());
   if (!main) return null;
   let cells: Cells | null | undefined;
+  let losses = 0;
   let last: { config: GradientConfig; time: number; pointer: PointerState } | null = null;
   const palette = new Float32Array(MAX_STOPS * 3);
   const meshPoints = new Float32Array(MAX_MESH_POINTS * 2);
@@ -246,7 +263,8 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
   }
 
   function onContextLost(event: Event): void {
-    event.preventDefault();
+    losses += 1;
+    if (losses <= MAX_RESTORES) event.preventDefault();
     main = null;
     cells = undefined;
   }
