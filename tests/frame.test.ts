@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { paceFrame } from "../src/frame";
+import { STALL_FRAME_MS, createStallWatch, paceFrame } from "../src/frame";
 
 function mulberry32(seed: number): () => number {
   let a = seed;
@@ -59,5 +59,33 @@ describe("paceFrame", () => {
     for (const hz of [30, 60, 90, 120, 144]) {
       expect(simulate(1000 / hz, 3, 0.3, hz).late).toBe(false);
     }
+  });
+});
+
+function watch(gaps: number[]): boolean[] {
+  const stall = createStallWatch();
+  let now = 1000;
+  const out = [stall(now)];
+  for (const gap of gaps) {
+    now += gap;
+    out.push(stall(now));
+  }
+  return out;
+}
+
+describe("createStallWatch", () => {
+  it("never trips at 60 or 30 fps", () => {
+    expect(watch(Array(120).fill(1000 / 60)).some(Boolean)).toBe(false);
+    expect(watch(Array(120).fill(1000 / 30)).some(Boolean)).toBe(false);
+  });
+
+  it("trips once most of a dozen frames are slower than the limit", () => {
+    const results = watch(Array(20).fill(STALL_FRAME_MS * 3));
+    expect(results.indexOf(true)).toBe(12);
+  });
+
+  it("ignores a few long gaps, like a tab coming back or a page still loading", () => {
+    const gaps = [...Array(10).fill(1000 / 60), 5000, 400, 300, ...Array(30).fill(1000 / 60)];
+    expect(watch(gaps).some(Boolean)).toBe(false);
   });
 });

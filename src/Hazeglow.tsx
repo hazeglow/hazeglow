@@ -21,7 +21,8 @@ import {
   type PointerTarget,
   type Renderer,
 } from "./core";
-import { paceFrame } from "./frame";
+import { createStallWatch, paceFrame } from "./frame";
+import { MAX_RESTORES } from "./renderer";
 
 export interface HazeglowHandle {
   getTime(): number;
@@ -39,6 +40,7 @@ const MAX_FRAME_SECONDS = 0.1;
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 const FILL: CSSProperties = { display: "block", width: "100%", height: "100%" };
 const FILL_REACTIVE: CSSProperties = { ...FILL, touchAction: "pan-y" };
+const HIDDEN: CSSProperties = { opacity: 0 };
 
 function subscribeReducedMotion(onChange: () => void): () => void {
   const query = window.matchMedia(REDUCED_MOTION);
@@ -68,6 +70,8 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
   const engagedRef = useRef(false);
   const [visible, setVisible] = useState(true);
   const [engaged, setEngaged] = useState(false);
+  const [stalled, setStalled] = useState(false);
+  const [shown, setShown] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
 
   useImperativeHandle(ref, () => ({ getTime: () => timeRef.current }), []);
@@ -91,6 +95,12 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
       return;
     }
     rendererRef.current = renderer;
+    let active = true;
+    void renderer.ready.then((ok) => {
+      if (!active) return;
+      if (ok) setShown(true);
+      else unsupportedRef.current?.();
+    });
 
     const resizeObserver = new ResizeObserver(() => {
       const ratio = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
@@ -105,7 +115,19 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
     });
     intersectionObserver.observe(canvas);
 
+    let losses = 0;
+    const onContextLost = () => {
+      losses += 1;
+      if (losses > MAX_RESTORES) {
+        setStalled(true);
+        unsupportedRef.current?.();
+      }
+    };
+    canvas.addEventListener("webglcontextlost", onContextLost);
+
     return () => {
+      active = false;
+      canvas.removeEventListener("webglcontextlost", onContextLost);
       resizeObserver.disconnect();
       intersectionObserver.disconnect();
       renderer.dispose();
@@ -120,14 +142,20 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
 
   const moving = config.motion !== "none" && !reducedMotion;
   const reactive = config.hover > 0 && !reducedMotion;
-  const running = visible && (moving || (reactive && engaged));
+  const running = visible && !stalled && (moving || (reactive && engaged));
 
   useEffect(() => {
     if (!running) return;
     let frame = 0;
     let previous = performance.now();
     let paced = previous;
+    const stall = createStallWatch();
     const tick = (now: number) => {
+      if (stall(now)) {
+        console.warn("[hazeglow] stopped animating: frames took longer than 100 ms, so this device draws a still frame instead.");
+        setStalled(true);
+        return;
+      }
       frame = requestAnimationFrame(tick);
       const next = paceFrame(paced, now);
       if (next === null) return;
@@ -173,7 +201,7 @@ export const Hazeglow = forwardRef<HazeglowHandle, HazeglowProps>(function Hazeg
         if (event.pointerType !== "mouse") release();
       }}
       className={className}
-      style={{ ...(reactive ? FILL_REACTIVE : FILL), ...style }}
+      style={{ ...(reactive ? FILL_REACTIVE : FILL), ...(shown ? null : HIDDEN), ...style }}
     />
   );
 });

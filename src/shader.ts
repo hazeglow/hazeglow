@@ -370,19 +370,43 @@ export function fragmentShader(): string {
 
 ` + constants(glyphCodes()) + hashes() + noise() + grain() + gradient() + `vec3 applyEffect(vec2 pixel) {
   float scale = min(u_resolution.x, u_resolution.y) / 1080.0;
+  float cell = 1.0;
+  vec2 id = vec2(0.0);
+  vec2 grid = vec2(0.0);
+  float rib = 1.0;
+  float across = 0.0;
+  vec2 samplePoint = pixel;
 
   if (u_effect == EFFECT_DITHER) {
-    float cell = max(1.0, round(u_effectSize * scale));
-    vec2 id = floor(pixel / cell);
-    vec3 color = gradientAt((id + 0.5) * cell);
+    cell = max(1.0, round(u_effectSize * scale));
+    id = floor(pixel / cell);
+    samplePoint = (id + 0.5) * cell;
+  } else if (u_effect == EFFECT_ASCII) {
+    cell = max(7.0, u_effectSize * scale);
+    id = floor(pixel / cell);
+    samplePoint = (id + 0.5) * cell;
+  } else if (u_effect == EFFECT_HALFTONE) {
+    cell = max(3.0, u_effectSize * scale);
+    grid = HALFTONE_ROTATION * pixel / cell;
+    id = floor(grid) + 0.5;
+    samplePoint = transpose(HALFTONE_ROTATION) * id * cell;
+  } else if (u_effect == EFFECT_PIXELATE) {
+    cell = max(1.0, round(u_effectSize * scale));
+    samplePoint = (floor(pixel / cell) + 0.5) * cell;
+  } else if (u_effect == EFFECT_GLASS) {
+    rib = max(2.0, u_effectSize * scale);
+    across = fract(pixel.x / rib) - 0.5;
+    samplePoint = pixel + vec2(across * rib * u_effectAmount * 8.0, 0.0);
+  }
+
+  vec3 color = gradientAt(samplePoint);
+
+  if (u_effect == EFFECT_DITHER) {
     float steps = floor(mix(1.0, 7.0, u_effectAmount) + 0.5);
     return floor(color * steps + bayer(ivec2(id))) / steps;
   }
 
   if (u_effect == EFFECT_ASCII) {
-    float cell = max(7.0, u_effectSize * scale);
-    vec2 id = floor(pixel / cell);
-    vec3 color = gradientAt((id + 0.5) * cell);
     float peak = max(color.r, max(color.g, color.b));
     float brightness = pow(clamp(mix(dot(color, LUMA), peak, 0.5), 0.0, 0.999), 0.75);
     int index = int(floor(brightness * float(GLYPH_COUNT + 1)));
@@ -400,10 +424,6 @@ export function fragmentShader(): string {
   }
 
   if (u_effect == EFFECT_HALFTONE) {
-    float cell = max(3.0, u_effectSize * scale);
-    vec2 grid = HALFTONE_ROTATION * pixel / cell;
-    vec2 id = floor(grid) + 0.5;
-    vec3 color = gradientAt(transpose(HALFTONE_ROTATION) * id * cell);
     float peak = max(color.r, max(color.g, color.b));
     float radius = sqrt(peak) * mix(0.4, 0.75, u_effectAmount);
     float edge = 0.75 / cell;
@@ -411,20 +431,12 @@ export function fragmentShader(): string {
     return color / max(peak, 1e-3) * coverage;
   }
 
-  if (u_effect == EFFECT_PIXELATE) {
-    float cell = max(1.0, round(u_effectSize * scale));
-    return gradientAt((floor(pixel / cell) + 0.5) * cell);
-  }
-
   if (u_effect == EFFECT_GLASS) {
-    float rib = max(2.0, u_effectSize * scale);
-    float across = fract(pixel.x / rib) - 0.5;
-    vec3 color = gradientAt(pixel + vec2(across * rib * u_effectAmount * 8.0, 0.0));
     color *= 1.0 + 0.3 * u_effectAmount * across;
     return color * (1.0 - 0.3 * u_effectAmount * smoothstep(0.38, 0.5, abs(across)));
   }
 
-  return gradientAt(pixel);
+  return color;
 }
 
 ` + effectMain();

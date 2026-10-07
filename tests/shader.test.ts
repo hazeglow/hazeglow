@@ -12,8 +12,8 @@ describe("shader source", () => {
   });
 
   it("keeps the fragment shader byte for byte, so the picture cannot drift", () => {
-    expect(fragmentShader()).toHaveLength(13118);
-    expect(sha256(fragmentShader())).toBe("2526fda2103ecac1bddb4b99aaf5c7faefc4328cc582a3c5438aaf5cf404a7f3");
+    expect(fragmentShader()).toHaveLength(13347);
+    expect(sha256(fragmentShader())).toBe("f3835660a066b2c8cfe4bbb049792072a23878d285e2e0e2c48a31a05e6338b6");
   });
 
   it("builds the same source every time", () => {

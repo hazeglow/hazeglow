@@ -21,6 +21,9 @@ export interface FakeGlOptions {
   failSource?: string;
   maxTextureSize?: number;
   growErrorAbove?: number;
+  renderer?: string;
+  unmasked?: string;
+  parallel?: { done: boolean | ((program: number) => boolean); linked?: boolean };
 }
 
 export interface FakeGl {
@@ -29,7 +32,8 @@ export interface FakeGl {
   drawLog: Draw[];
   calls: Call[];
   draws(): number;
-  fire(type: string): void;
+  fire(type: string): boolean;
+  lost(): number;
 }
 
 const GL = {
@@ -38,6 +42,7 @@ const GL = {
   MAX_TEXTURE_SIZE: 0x0d33,
   MAX_RENDERBUFFER_SIZE: 0x84e8,
   MAX_VIEWPORT_DIMS: 0x0d3a,
+  RENDERER: 0x1f01,
   NO_ERROR: 0,
   OUT_OF_MEMORY: 0x0505,
 };
@@ -56,6 +61,7 @@ const RECORDED = new Set([
   "texImage2D",
   "bindFramebuffer",
   "bindTexture",
+  "getProgramParameter",
 ]);
 
 function snapshot(values: unknown[]): number[] {
@@ -78,11 +84,24 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
   let framebuffer = false;
   let viewport: number[] = [];
   let pendingError = 0;
+  let losses = 0;
+  const UNMASKED = 0x9246;
+  const COMPLETION = 0x91b1;
 
   const methods: Record<string, (...args: never[]) => unknown> = {
     getUniformLocation: (_program: unknown, name: string) => name,
+    getExtension: (name: string) =>
+      name === "WEBGL_debug_renderer_info"
+        ? options.unmasked === undefined
+          ? null
+          : { UNMASKED_RENDERER_WEBGL: UNMASKED }
+        : name === "WEBGL_lose_context"
+          ? { loseContext: () => void (losses += 1) }
+          : name === "KHR_parallel_shader_compile" && options.parallel
+            ? { COMPLETION_STATUS_KHR: COMPLETION }
+            : null,
     getParameter: (name: number) =>
-      name === GL.MAX_VIEWPORT_DIMS ? Int32Array.of(4096, 4096) : name === GL.MAX_TEXTURE_SIZE ? (options.maxTextureSize ?? 4096) : name === GL.MAX_RENDERBUFFER_SIZE ? 4096 : undefined,
+      name === GL.RENDERER ? (options.renderer ?? "WebKit WebGL") : name === UNMASKED ? options.unmasked : name === GL.MAX_VIEWPORT_DIMS ? Int32Array.of(4096, 4096) : name === GL.MAX_TEXTURE_SIZE ? (options.maxTextureSize ?? 4096) : name === GL.MAX_RENDERBUFFER_SIZE ? 4096 : undefined,
     texImage2D: (...args: unknown[]) => {
       if (options.growErrorAbove !== undefined && (args[3] as number) > options.growErrorAbove) pendingError = GL.OUT_OF_MEMORY;
     },
@@ -95,7 +114,11 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
     shaderSource: (shader: { source: string }, source: string) => void (shader.source = source),
     getShaderParameter: (shader: { source: string }) => !(options.failSource && shader.source.includes(options.failSource)),
     createProgram: () => ({ id: ++programs }),
-    getProgramParameter: () => true,
+    getProgramParameter: (program: { id: number }, name: number) => {
+      if (name !== COMPLETION) return options.parallel?.linked ?? true;
+      const done = options.parallel?.done ?? true;
+      return typeof done === "function" ? done(program.id) : done;
+    },
     useProgram: (program: { id: number } | null) => void (current = program?.id ?? 0),
     bindFramebuffer: (_target: number, target: unknown) => void (framebuffer = target !== null),
     viewport: (...args: number[]) => void (viewport = args),
@@ -139,6 +162,11 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
     drawLog,
     calls,
     draws: () => drawLog.length,
-    fire: (type) => listeners.get(type)?.({ preventDefault() {} } as Event),
+    fire: (type) => {
+      let prevented = false;
+      listeners.get(type)?.({ preventDefault: () => void (prevented = true) } as Event);
+      return prevented;
+    },
+    lost: () => losses,
   };
 }

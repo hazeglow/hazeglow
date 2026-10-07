@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { hexToOklab } from "../src/color";
 import { DEFAULT_CONFIG, type GradientConfig } from "../src/config";
 import { parseOklch } from "../src/css-color";
@@ -11,7 +11,7 @@ interface Harness {
   uploads: Upload[];
   draws(): number;
   names(): string[];
-  fire(type: string): void;
+  fire(type: string): boolean;
 }
 
 const PER_FRAME = ["u_pointer", "u_pointerForce", "u_resolution", "u_time"];
@@ -261,5 +261,98 @@ describe("createRenderer colour tokens", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe("software rendering", () => {
+  it.each([
+    "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+    "llvmpipe (LLVM 15.0.7, 256 bits)",
+    "ANGLE (Microsoft, Microsoft Basic Render Driver Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "Google SwiftShader",
+  ])("returns null and releases the context on %s", (unmasked) => {
+    const gl = fakeGl({}, { unmasked });
+    expect(createRenderer(gl.canvas)).toBeNull();
+    expect(gl.lost()).toBe(1);
+  });
+
+  it.each([
+    "ANGLE (AMD, AMD Radeon RX 6600 (0x000073FF) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "ANGLE (Apple, ANGLE Metal Renderer: Apple M5, Unspecified Version)",
+    "Apple GPU",
+  ])("keeps a hardware renderer: %s", (unmasked) => {
+    const gl = fakeGl({}, { unmasked });
+    expect(createRenderer(gl.canvas)).not.toBeNull();
+    expect(gl.lost()).toBe(0);
+  });
+
+  it("reads the renderer name when the browser reports it directly", () => {
+    expect(createRenderer(fakeGl({}, { renderer: "llvmpipe (LLVM 15.0.7, 256 bits)" }).canvas)).toBeNull();
+    expect(createRenderer(fakeGl({}, { renderer: "ANGLE (AMD, Radeon RX 6600)" }).canvas)).not.toBeNull();
+  });
+
+  it("keeps working when the browser hides the renderer name", () => {
+    expect(createRenderer(fakeGl().canvas)).not.toBeNull();
+  });
+});
+
+describe("context loss", () => {
+  it("asks for the context back once, then lets it go", () => {
+    const gl = fakeGl();
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DEFAULT_CONFIG, 0);
+    expect(gl.fire("webglcontextlost")).toBe(true);
+    gl.fire("webglcontextrestored");
+    expect(gl.fire("webglcontextlost")).toBe(false);
+  });
+});
+
+describe("background compiling of the main shader", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is ready at once without the extension", async () => {
+    const renderer = createRenderer(fakeGl().canvas);
+    await expect(renderer?.ready).resolves.toBe(true);
+  });
+
+  it("draws nothing and does not wait while the main shader compiles", () => {
+    const gl = fakeGl({}, { parallel: { done: false } });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DEFAULT_CONFIG, 0);
+    expect(gl.draws()).toBe(0);
+    expect(gl.calls.filter((call) => call.method === "getProgramParameter" && call.args[1] === 0x8b82)).toEqual([]);
+  });
+
+  it("draws the last requested frame once the compile finishes, and resolves ready", async () => {
+    vi.useFakeTimers();
+    const parallel = { done: false };
+    const gl = fakeGl({}, { parallel });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DEFAULT_CONFIG, 1.5);
+    parallel.done = true;
+    await vi.advanceTimersByTimeAsync(20);
+    expect(gl.draws()).toBe(1);
+    await expect(renderer?.ready).resolves.toBe(true);
+  });
+
+  it("resolves ready to false when the main shader fails to link", async () => {
+    vi.useFakeTimers();
+    const gl = fakeGl({}, { parallel: { done: true, linked: false } });
+    const renderer = createRenderer(gl.canvas);
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(renderer?.ready).resolves.toBe(false);
+    renderer?.render(DEFAULT_CONFIG, 0);
+    expect(gl.draws()).toBe(0);
+  });
+
+  it("stops polling and resolves false when disposed before the compile finishes", async () => {
+    vi.useFakeTimers();
+    const gl = fakeGl({}, { parallel: { done: false } });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.dispose();
+    await expect(renderer?.ready).resolves.toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
