@@ -23,6 +23,7 @@ export interface FakeGlOptions {
   growErrorAbove?: number;
   renderer?: string;
   unmasked?: string;
+  parallel?: { done: boolean };
 }
 
 export interface FakeGl {
@@ -60,6 +61,7 @@ const RECORDED = new Set([
   "texImage2D",
   "bindFramebuffer",
   "bindTexture",
+  "getProgramParameter",
 ]);
 
 function snapshot(values: unknown[]): number[] {
@@ -84,6 +86,7 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
   let pendingError = 0;
   let losses = 0;
   const UNMASKED = 0x9246;
+  const COMPLETION = 0x91b1;
 
   const methods: Record<string, (...args: never[]) => unknown> = {
     getUniformLocation: (_program: unknown, name: string) => name,
@@ -94,7 +97,9 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
           : { UNMASKED_RENDERER_WEBGL: UNMASKED }
         : name === "WEBGL_lose_context"
           ? { loseContext: () => void (losses += 1) }
-          : null,
+          : name === "KHR_parallel_shader_compile" && options.parallel
+            ? { COMPLETION_STATUS_KHR: COMPLETION }
+            : null,
     getParameter: (name: number) =>
       name === GL.RENDERER ? (options.renderer ?? "WebKit WebGL") : name === UNMASKED ? options.unmasked : name === GL.MAX_VIEWPORT_DIMS ? Int32Array.of(4096, 4096) : name === GL.MAX_TEXTURE_SIZE ? (options.maxTextureSize ?? 4096) : name === GL.MAX_RENDERBUFFER_SIZE ? 4096 : undefined,
     texImage2D: (...args: unknown[]) => {
@@ -109,7 +114,7 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
     shaderSource: (shader: { source: string }, source: string) => void (shader.source = source),
     getShaderParameter: (shader: { source: string }) => !(options.failSource && shader.source.includes(options.failSource)),
     createProgram: () => ({ id: ++programs }),
-    getProgramParameter: () => true,
+    getProgramParameter: (_program: unknown, name: number) => (name === COMPLETION ? (options.parallel?.done ?? true) : true),
     useProgram: (program: { id: number } | null) => void (current = program?.id ?? 0),
     bindFramebuffer: (_target: number, target: unknown) => void (framebuffer = target !== null),
     viewport: (...args: number[]) => void (viewport = args),

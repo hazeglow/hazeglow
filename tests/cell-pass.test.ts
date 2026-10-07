@@ -209,3 +209,54 @@ describe("cell pass", () => {
     });
   });
 });
+
+describe("cell pass with background compiling", () => {
+  const DITHER: GradientConfig = { ...DEFAULT_CONFIG, effect: "dither", effectSize: 16 };
+  const LINK_STATUS = 0x8b82;
+
+  function linkQueries(calls: { method: string; args: unknown[] }[]): number {
+    return calls.filter((call) => call.method === "getProgramParameter" && call.args[1] === LINK_STATUS).length;
+  }
+
+  it("draws on the single pass, without waiting, while the cell shaders compile", () => {
+    const parallel = { done: false };
+    const gl = fakeGl({}, { parallel });
+    const renderer = createRenderer(gl.canvas);
+    const before = linkQueries(gl.calls);
+    renderer?.render(DITHER, TIME, POINTER);
+    renderer?.render(DITHER, TIME, POINTER);
+    expect(gl.drawLog.map((draw) => draw.program)).toEqual([1, 1]);
+    expect(linkQueries(gl.calls)).toBe(before);
+  });
+
+  it("switches to the cell pass on the first frame after the compile finishes", () => {
+    const parallel = { done: false };
+    const gl = fakeGl({}, { parallel });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DITHER, TIME, POINTER);
+    parallel.done = true;
+    renderer?.render(DITHER, TIME, POINTER);
+    expect(gl.drawLog.map((draw) => [draw.program, draw.framebuffer])).toEqual([
+      [1, false],
+      [2, true],
+      [3, false],
+    ]);
+  });
+
+  it("sends the single pass the same uniforms while it stands in for the cell pass", () => {
+    const waiting = fakeGl({}, { parallel: { done: false } });
+    const single = fakeGl({}, { cells: false });
+    createRenderer(waiting.canvas)?.render(DITHER, TIME, POINTER);
+    createRenderer(single.canvas)?.render(DITHER, TIME, POINTER);
+    expect(rows(waiting.uploads)).toEqual(rows(single.uploads));
+  });
+
+  it("frees shaders that are still compiling on dispose", () => {
+    const gl = fakeGl({}, { parallel: { done: false } });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DITHER, TIME, POINTER);
+    const created = gl.calls.filter((call) => call.method === "createProgram").length;
+    renderer?.dispose();
+    expect(gl.calls.filter((call) => call.method === "deleteProgram").length).toBe(created);
+  });
+});

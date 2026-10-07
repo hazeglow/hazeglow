@@ -55,6 +55,16 @@ interface Pass {
   uniforms: Uniforms;
 }
 
+interface PendingCells {
+  pending: true;
+  cell: WebGLProgram;
+  composite: WebGLProgram;
+}
+
+interface Parallel {
+  COMPLETION_STATUS_KHR: number;
+}
+
 interface Cells {
   cell: Pass;
   composite: Pass;
@@ -78,6 +88,43 @@ function compile(gl: WebGL2RenderingContext, type: number, source: string): WebG
   return shader;
 }
 
+function uniformsOf(gl: WebGL2RenderingContext, program: WebGLProgram): Uniforms {
+  const uniforms = {} as Uniforms;
+  for (const name of UNIFORMS) uniforms[name] = gl.getUniformLocation(program, name);
+  return uniforms;
+}
+
+function startLink(gl: WebGL2RenderingContext, source: string): WebGLProgram | null {
+  const vertex = gl.createShader(gl.VERTEX_SHADER);
+  const fragment = gl.createShader(gl.FRAGMENT_SHADER);
+  const program = gl.createProgram();
+  if (!vertex || !fragment || !program) {
+    if (vertex) gl.deleteShader(vertex);
+    if (fragment) gl.deleteShader(fragment);
+    if (program) gl.deleteProgram(program);
+    return null;
+  }
+  gl.shaderSource(vertex, VERTEX_SHADER);
+  gl.compileShader(vertex);
+  gl.shaderSource(fragment, source);
+  gl.compileShader(fragment);
+  gl.attachShader(program, vertex);
+  gl.attachShader(program, fragment);
+  gl.linkProgram(program);
+  gl.deleteShader(vertex);
+  gl.deleteShader(fragment);
+  return program;
+}
+
+function finishLink(gl: WebGL2RenderingContext, program: WebGLProgram): Pass | null {
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS) && !gl.isContextLost()) {
+    console.error("[hazeglow] program link failed:", gl.getProgramInfoLog(program));
+    gl.deleteProgram(program);
+    return null;
+  }
+  return { program, uniforms: uniformsOf(gl, program) };
+}
+
 function link(gl: WebGL2RenderingContext, source: string): Pass | null {
   const vertex = compile(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
   const fragment = compile(gl, gl.FRAGMENT_SHADER, source);
@@ -97,9 +144,7 @@ function link(gl: WebGL2RenderingContext, source: string): Pass | null {
     gl.deleteProgram(program);
     return null;
   }
-  const uniforms = {} as Uniforms;
-  for (const name of UNIFORMS) uniforms[name] = gl.getUniformLocation(program, name);
-  return { program, uniforms };
+  return { program, uniforms: uniformsOf(gl, program) };
 }
 
 function createCells(gl: WebGL2RenderingContext): Cells | null {
@@ -110,6 +155,31 @@ function createCells(gl: WebGL2RenderingContext): Cells | null {
     gl.deleteProgram(cell.program);
     return null;
   }
+  return attachTargets(gl, cell, composite);
+}
+
+function startCells(gl: WebGL2RenderingContext, parallel: Parallel | null): Cells | PendingCells | null {
+  if (!parallel) return createCells(gl);
+  const cell = startLink(gl, cellShader());
+  const composite = startLink(gl, compositeShader());
+  if (cell && composite) return { pending: true, cell, composite };
+  if (cell) gl.deleteProgram(cell);
+  if (composite) gl.deleteProgram(composite);
+  return null;
+}
+
+function settleCells(gl: WebGL2RenderingContext, pending: PendingCells, parallel: Parallel): Cells | PendingCells | null {
+  const done = (program: WebGLProgram) => gl.getProgramParameter(program, parallel.COMPLETION_STATUS_KHR) !== false;
+  if (!done(pending.cell) || !done(pending.composite)) return pending;
+  const cell = finishLink(gl, pending.cell);
+  const composite = finishLink(gl, pending.composite);
+  if (cell && composite) return attachTargets(gl, cell, composite);
+  if (cell) gl.deleteProgram(cell.program);
+  if (composite) gl.deleteProgram(composite.program);
+  return null;
+}
+
+function attachTargets(gl: WebGL2RenderingContext, cell: Pass, composite: Pass): Cells | null {
   const texture = gl.createTexture();
   const framebuffer = gl.createFramebuffer();
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -163,7 +233,8 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
 
   let main = link(gl, fragmentShader());
   if (!main) return null;
-  let cells: Cells | null | undefined;
+  const parallel = gl.getExtension("KHR_parallel_shader_compile") as Parallel | null;
+  let cells: Cells | PendingCells | null | undefined;
   let losses = 0;
   let last: { config: GradientConfig; time: number; pointer: PointerState } | null = null;
   const palette = new Float32Array(MAX_STOPS * 3);
@@ -188,8 +259,10 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
     const width = gl.drawingBufferWidth;
     const height = gl.drawingBufferHeight;
     const grid = cellGrid(config.effect, config.effectSize, width, height);
-    if (grid && cells === undefined) cells = createCells(gl);
-    let active: Cells | null = grid && cells && grid.width <= cells.limit && grid.height <= cells.limit ? cells : null;
+    if (grid && cells === undefined) cells = startCells(gl, parallel);
+    if (grid && cells && "pending" in cells && parallel) cells = settleCells(gl, cells, parallel);
+    const ready = cells && !("pending" in cells) ? cells : null;
+    let active: Cells | null = grid && ready && grid.width <= ready.limit && grid.height <= ready.limit ? ready : null;
     if (grid && active) {
       gl.bindTexture(gl.TEXTURE_2D, active.texture);
       if (grid.width > active.width || grid.height > active.height) {
@@ -294,7 +367,12 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       if (main) gl.deleteProgram(main.program);
-      if (cells) deleteCells(gl, cells);
+      if (cells && "pending" in cells) {
+        gl.deleteProgram(cells.cell);
+        gl.deleteProgram(cells.composite);
+      } else if (cells) {
+        deleteCells(gl, cells);
+      }
       main = null;
       cells = undefined;
     },
