@@ -7,6 +7,7 @@ import { createColors } from "./tokens";
 
 export interface Renderer {
   readonly maxSize: number;
+  readonly ready: Promise<boolean>;
   render(config: GradientConfig, time: number, pointer?: PointerState): void;
   resize(width: number, height: number): void;
   dispose(): void;
@@ -44,6 +45,7 @@ const UNIFORMS = [
 ] as const;
 
 export const MAX_RESTORES = 1;
+const MAIN_POLL_MS = 16;
 const SOFTWARE_RENDERER = /swiftshader|llvmpipe|softpipe|lavapipe|basic render|software/i;
 const GENERIC_RENDERER = "WebKit WebGL";
 
@@ -231,9 +233,19 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
     return null;
   }
 
-  let main = link(gl, fragmentShader());
-  if (!main) return null;
   const parallel = gl.getExtension("KHR_parallel_shader_compile") as Parallel | null;
+  let main: Pass | null = null;
+  let pendingMain: WebGLProgram | null = null;
+  if (parallel) pendingMain = startLink(gl, fragmentShader());
+  else main = link(gl, fragmentShader());
+  if (!main && !pendingMain) return null;
+  let settle: (ok: boolean) => void = () => {};
+  const ready = new Promise<boolean>((resolve) => {
+    settle = resolve;
+  });
+  if (main) settle(true);
+  let poll: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
   let cells: Cells | PendingCells | null | undefined;
   let losses = 0;
   let last: { config: GradientConfig; time: number; pointer: PointerState } | null = null;
@@ -244,9 +256,32 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
     if (last) render(last.config, last.time, last.pointer);
   });
 
+  function mainReady(): boolean {
+    if (main) return true;
+    if (!pendingMain || !parallel || gl.isContextLost()) return false;
+    if (gl.getProgramParameter(pendingMain, parallel.COMPLETION_STATUS_KHR) === false) return false;
+    const program = pendingMain;
+    pendingMain = null;
+    main = finishLink(gl, program);
+    settle(main !== null);
+    return main !== null;
+  }
+
+  function watchMain(): void {
+    poll = null;
+    if (disposed) return;
+    if (mainReady()) {
+      if (last) render(last.config, last.time, last.pointer);
+      return;
+    }
+    if (pendingMain) poll = setTimeout(watchMain, MAIN_POLL_MS);
+  }
+
   function render(config: GradientConfig, time: number, pointer: PointerState = IDLE_POINTER): void {
     last = { config, time, pointer };
-    if (!main || gl.isContextLost()) return;
+    if (gl.isContextLost() || !mainReady()) return;
+    const single = main;
+    if (!single) return;
     const stops = config.palette.slice(0, MAX_STOPS);
     stops.forEach((stop, index) => palette.set(colors.get(stop), index * 3));
     const mesh = config.mesh.slice(0, MAX_MESH_POINTS);
@@ -286,7 +321,7 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
       draw(active.composite, width, height, config, time, pointer, stops.length, mesh.length);
       return;
     }
-    draw(main, width, height, config, time, pointer, stops.length, mesh.length);
+    draw(single, width, height, config, time, pointer, stops.length, mesh.length);
   }
 
   function draw(
@@ -339,22 +374,30 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
     losses += 1;
     if (losses <= MAX_RESTORES) event.preventDefault();
     main = null;
+    pendingMain = null;
     cells = undefined;
   }
 
   function onContextRestored(): void {
+    if (parallel) {
+      pendingMain = startLink(gl, fragmentShader());
+      if (pendingMain && poll === null) poll = setTimeout(watchMain, MAIN_POLL_MS);
+      return;
+    }
     main = link(gl, fragmentShader());
     if (main && last) render(last.config, last.time, last.pointer);
   }
 
   canvas.addEventListener("webglcontextlost", onContextLost);
   canvas.addEventListener("webglcontextrestored", onContextRestored);
+  if (pendingMain) poll = setTimeout(watchMain, MAIN_POLL_MS);
 
   return {
     maxSize: Math.min(
       gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number,
       ...(gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array),
     ),
+    ready,
     render,
     resize(width, height) {
       const nextWidth = Math.max(1, Math.round(width));
@@ -363,6 +406,12 @@ export function createRenderer(canvas: HTMLCanvasElement | OffscreenCanvas): Ren
       if (canvas.height !== nextHeight) canvas.height = nextHeight;
     },
     dispose() {
+      disposed = true;
+      if (poll !== null) clearTimeout(poll);
+      poll = null;
+      if (pendingMain) gl.deleteProgram(pendingMain);
+      pendingMain = null;
+      settle(false);
       colors.dispose();
       canvas.removeEventListener("webglcontextlost", onContextLost);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);

@@ -1,5 +1,5 @@
 ---
-"hazeglow": patch
+"hazeglow": minor
 ---
 
-Stop the page from freezing for seconds the first time a dither, pixelate or ascii gradient draws on Windows: the extra shaders for those effects now compile in the background where the browser supports it, and the gradient draws on the main shader (pixel-identical) until they are ready. `createRenderer` also returns null on software WebGL (SwiftShader, llvmpipe, Microsoft Basic Render Driver) so your fallback shows, `<Hazeglow>` stops animating when frames take longer than 100 ms, and it calls `onUnsupported` once the GPU context is lost a second time.
+No more multi-second freezes while shaders compile on Windows. Shaders now compile in the background where the browser supports it, and the main shader calls the gradient once instead of once per effect, so Direct3D compiles it far faster. New: `renderer.ready`, a promise that resolves to `true` once the renderer can draw (or `false` if it cannot); `render` calls before that are kept and the last one is drawn as soon as it is ready, so await `ready` before reading pixels back. `<Hazeglow>` stays transparent until its shader is ready. `createRenderer` now returns null on software WebGL (SwiftShader, llvmpipe, Microsoft Basic Render Driver), `<Hazeglow>` stops animating when frames take longer than 100 ms, and calls `onUnsupported` when the shader fails or the GPU context is lost a second time. The restructured shader can differ from 0.5 by one colour level in a few pixels out of millions.

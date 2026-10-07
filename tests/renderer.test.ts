@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { hexToOklab } from "../src/color";
 import { DEFAULT_CONFIG, type GradientConfig } from "../src/config";
 import { parseOklch } from "../src/css-color";
@@ -304,5 +304,55 @@ describe("context loss", () => {
     expect(gl.fire("webglcontextlost")).toBe(true);
     gl.fire("webglcontextrestored");
     expect(gl.fire("webglcontextlost")).toBe(false);
+  });
+});
+
+describe("background compiling of the main shader", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is ready at once without the extension", async () => {
+    const renderer = createRenderer(fakeGl().canvas);
+    await expect(renderer?.ready).resolves.toBe(true);
+  });
+
+  it("draws nothing and does not wait while the main shader compiles", () => {
+    const gl = fakeGl({}, { parallel: { done: false } });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DEFAULT_CONFIG, 0);
+    expect(gl.draws()).toBe(0);
+    expect(gl.calls.filter((call) => call.method === "getProgramParameter" && call.args[1] === 0x8b82)).toEqual([]);
+  });
+
+  it("draws the last requested frame once the compile finishes, and resolves ready", async () => {
+    vi.useFakeTimers();
+    const parallel = { done: false };
+    const gl = fakeGl({}, { parallel });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.render(DEFAULT_CONFIG, 1.5);
+    parallel.done = true;
+    await vi.advanceTimersByTimeAsync(20);
+    expect(gl.draws()).toBe(1);
+    await expect(renderer?.ready).resolves.toBe(true);
+  });
+
+  it("resolves ready to false when the main shader fails to link", async () => {
+    vi.useFakeTimers();
+    const gl = fakeGl({}, { parallel: { done: true, linked: false } });
+    const renderer = createRenderer(gl.canvas);
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(renderer?.ready).resolves.toBe(false);
+    renderer?.render(DEFAULT_CONFIG, 0);
+    expect(gl.draws()).toBe(0);
+  });
+
+  it("stops polling and resolves false when disposed before the compile finishes", async () => {
+    vi.useFakeTimers();
+    const gl = fakeGl({}, { parallel: { done: false } });
+    const renderer = createRenderer(gl.canvas);
+    renderer?.dispose();
+    await expect(renderer?.ready).resolves.toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

@@ -23,7 +23,7 @@ export interface FakeGlOptions {
   growErrorAbove?: number;
   renderer?: string;
   unmasked?: string;
-  parallel?: { done: boolean };
+  parallel?: { done: boolean | ((program: number) => boolean); linked?: boolean };
 }
 
 export interface FakeGl {
@@ -114,7 +114,11 @@ export function fakeGl(canvasExtras: Record<string, unknown> = {}, options: Fake
     shaderSource: (shader: { source: string }, source: string) => void (shader.source = source),
     getShaderParameter: (shader: { source: string }) => !(options.failSource && shader.source.includes(options.failSource)),
     createProgram: () => ({ id: ++programs }),
-    getProgramParameter: (_program: unknown, name: number) => (name === COMPLETION ? (options.parallel?.done ?? true) : true),
+    getProgramParameter: (program: { id: number }, name: number) => {
+      if (name !== COMPLETION) return options.parallel?.linked ?? true;
+      const done = options.parallel?.done ?? true;
+      return typeof done === "function" ? done(program.id) : done;
+    },
     useProgram: (program: { id: number } | null) => void (current = program?.id ?? 0),
     bindFramebuffer: (_target: number, target: unknown) => void (framebuffer = target !== null),
     viewport: (...args: number[]) => void (viewport = args),

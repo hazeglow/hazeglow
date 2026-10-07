@@ -219,7 +219,7 @@ describe("cell pass with background compiling", () => {
   }
 
   it("draws on the single pass, without waiting, while the cell shaders compile", () => {
-    const parallel = { done: false };
+    const parallel = { done: (program: number) => program === 1 };
     const gl = fakeGl({}, { parallel });
     const renderer = createRenderer(gl.canvas);
     const before = linkQueries(gl.calls);
@@ -230,7 +230,7 @@ describe("cell pass with background compiling", () => {
   });
 
   it("switches to the cell pass on the first frame after the compile finishes", () => {
-    const parallel = { done: false };
+    const parallel: { done: boolean | ((program: number) => boolean) } = { done: (program: number) => program === 1 };
     const gl = fakeGl({}, { parallel });
     const renderer = createRenderer(gl.canvas);
     renderer?.render(DITHER, TIME, POINTER);
@@ -244,7 +244,7 @@ describe("cell pass with background compiling", () => {
   });
 
   it("sends the single pass the same uniforms while it stands in for the cell pass", () => {
-    const waiting = fakeGl({}, { parallel: { done: false } });
+    const waiting = fakeGl({}, { parallel: { done: (program: number) => program === 1 } });
     const single = fakeGl({}, { cells: false });
     createRenderer(waiting.canvas)?.render(DITHER, TIME, POINTER);
     createRenderer(single.canvas)?.render(DITHER, TIME, POINTER);

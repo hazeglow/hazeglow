@@ -15,8 +15,12 @@ describe("Hazeglow", () => {
 
   it("fills its parent with inline styles, so no stylesheet is needed", () => {
     expect(renderToStaticMarkup(<Hazeglow config={still} />)).toBe(
-      '<canvas aria-hidden="true" style="display:block;width:100%;height:100%"></canvas>',
+      '<canvas aria-hidden="true" style="display:block;width:100%;height:100%;opacity:0"></canvas>',
     );
+  });
+
+  it("stays transparent until its shader is ready, so the background behind it shows meanwhile", () => {
+    expect(renderToStaticMarkup(<Hazeglow config={still} />)).toContain("opacity:0");
   });
 
   it("leaves touch-action alone while hover is off", () => {
