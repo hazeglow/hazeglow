@@ -1,5 +1,12 @@
 # hazeglow
 
+## 0.6.1
+
+### Patch Changes
+
+- 3c8aa4b: The package now ships AGENTS.md and an Agent Skill (skills/hazeglow), so coding agents can learn how to use it from node_modules or with npx skills add hazeglow/hazeglow.
+- 28d5d2b: Clearer npm description and search keywords, and the README now links the generator and llms.txt up top.
+
 ## 0.6.0
 
 ### Minor Changes
