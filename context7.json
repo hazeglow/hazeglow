@@ -1,0 +1,15 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/hazeglow/hazeglow",
+  "public_key": "pk_opC4xj8eVnLJFbF50821z",
+  "projectTitle": "Hazeglow",
+  "description": "Animated, grainy gradient backgrounds and mesh gradients for React. WebGL2, zero dependencies.",
+  "rules": [
+    "Import from 'hazeglow' in React and from 'hazeglow/core' without React.",
+    "Always pass a config through parseConfig before rendering it.",
+    "Render <Hazeglow config={config} /> absolutely positioned inside a relatively positioned container, behind the content.",
+    "Prefer a config designed at https://hazeglow.dev/generator over inventing colors, and never put a CSS gradient on top of the canvas.",
+    "Colors can be hex, oklch() or var(--token) with a fallback (hazeglow 0.3.0 or newer).",
+    "Keep live gradients to a few per page; browsers allow about 16 WebGL canvases, so use a still image elsewhere."
+  ]
+}
