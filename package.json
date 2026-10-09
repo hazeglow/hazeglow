@@ -1,6 +1,6 @@
 {
   "name": "hazeglow",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Animated, grainy gradient backgrounds and mesh gradients for React. WebGL2, zero dependencies.",
   "keywords": [
     "react",
