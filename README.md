@@ -1,8 +1,10 @@
 # hazeglow
 
-Soft, grainy, glowing gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion and an optional hover pull. Drawn on the GPU with WebGL2. Zero dependencies. ~13kb gzipped. MIT.
+Animated, grainy gradient backgrounds and mesh gradients for React. A small JSON config goes in, a canvas comes out: a blurred shape or a colour mesh, with film grain, slow motion, an optional hover pull and dither, ASCII, halftone, pixel or glass effects. Drawn on the GPU with WebGL2. Zero dependencies. ~13kb gzipped. MIT.
 
 **Design your own:** https://hazeglow.dev/generator
+
+**For AI coding agents:** https://hazeglow.dev/llms.txt
 
 ![Six gradients made with hazeglow: dither tide, ivory, deep reef, ASCII aurora, moss and borealis](https://raw.githubusercontent.com/hazeglow/hazeglow/main/docs/cover.jpg)
 

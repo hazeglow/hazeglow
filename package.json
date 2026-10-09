@@ -1,7 +1,7 @@
 {
   "name": "hazeglow",
   "version": "0.6.0",
-  "description": "Soft, grainy, glowing gradients for React. WebGL2, zero dependencies.",
+  "description": "Animated, grainy gradient backgrounds and mesh gradients for React. WebGL2, zero dependencies.",
   "keywords": [
     "react",
     "gradient",
@@ -11,7 +11,19 @@
     "webgl2",
     "shader",
     "grain",
-    "noise"
+    "noise",
+    "animated-gradient",
+    "gradient-background",
+    "gradient-generator",
+    "mesh-gradient-react",
+    "grainy-gradient",
+    "dither",
+    "ascii",
+    "halftone",
+    "stripe-gradient",
+    "nextjs",
+    "hero",
+    "background-animation"
   ],
   "author": "Jakub Šalmík <som@jakubsalmik.com>",
   "license": "MIT",
