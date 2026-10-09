@@ -4,7 +4,7 @@ Animated, grainy gradient backgrounds and mesh gradients for React. A small JSON
 
 **Design your own:** https://hazeglow.dev/generator
 
-**For AI coding agents:** https://hazeglow.dev/llms.txt
+**For AI coding agents:** `npx skills add hazeglow/hazeglow`, or point yours at https://hazeglow.dev/llms.txt. The package also ships an `AGENTS.md`.
 
 ![Six gradients made with hazeglow: dither tide, ivory, deep reef, ASCII aurora, moss and borealis](https://raw.githubusercontent.com/hazeglow/hazeglow/main/docs/cover.jpg)
 

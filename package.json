@@ -52,6 +52,8 @@
   "sideEffects": false,
   "files": [
     "dist",
+    "skills",
+    "AGENTS.md",
     "README.md",
     "LICENSE"
   ],
